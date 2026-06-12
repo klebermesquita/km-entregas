@@ -163,6 +163,7 @@
   }
   .role-solicitante { background: var(--blue-dim); color: var(--blue); }
   .role-transportadora { background: var(--yellow-dim); color: var(--yellow); }
+  .role-admin { background: rgba(168,85,247,0.15); color: #a855f7; }
 
   /* ── NAV TABS ── */
   .nav-tabs {
@@ -620,8 +621,9 @@
       <button class="modal-close" onclick="closeModal('modal-view')">×</button>
     </div>
     <div class="modal-body" id="view-body"></div>
-    <div class="modal-footer">
+    <div class="modal-footer" id="view-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-view')">Fechar</button>
+      <button class="btn btn-ghost" onclick="downloadRecibo()" style="gap:6px;">⬇ Baixar Recibo PDF</button>
     </div>
   </div>
 </div>
@@ -647,6 +649,7 @@
         <select id="u-role">
           <option value="solicitante">Solicitante</option>
           <option value="transportadora">Transportadora</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
     </div>
@@ -718,7 +721,9 @@ async function doLogin() {
   if (username === 'admin' && password === 'faro2025') {
     const { data } = await sb.from('users').select('*').eq('username','admin').single();
     if (!data) {
-      await sb.from('users').insert({username:'admin', password_hash: hashPass('faro2025'), role:'solicitante'});
+      await sb.from('users').insert({username:'admin', password_hash: hashPass('faro2025'), role:'admin'});
+    } else if (data.role !== 'admin') {
+      await sb.from('users').update({role:'admin'}).eq('username','admin');
     }
   }
 
@@ -756,18 +761,25 @@ function showApp() {
 
   buildNav();
   const first = currentUser.role === 'transportadora' ? 'page-transporte' : 'page-dashboard';
+  // Guard: non-admin trying to access admin page
+  if (currentUser.role === 'solicitante') {
+    const adminPage = document.getElementById('page-admin');
+    if (adminPage) adminPage.style.display = 'none';
+  }
   showPage(first);
 }
 
 function buildNav() {
   const nav = document.getElementById('nav-tabs');
   nav.innerHTML = '';
-  const tabs = currentUser.role === 'transportadora'
-    ? [{id:'page-transporte',label:'Minhas Ordens'}]
-    : [
-        {id:'page-dashboard',label:'Dashboard'},
-        {id:'page-admin',label:'Usuários'}
-      ];
+  let tabs = [];
+  if (currentUser.role === 'transportadora') {
+    tabs = [{id:'page-transporte', label:'Minhas Ordens'}];
+  } else if (currentUser.role === 'admin') {
+    tabs = [{id:'page-dashboard', label:'Dashboard'}, {id:'page-admin', label:'Usuários'}];
+  } else {
+    tabs = [{id:'page-dashboard', label:'Dashboard'}];
+  }
 
   tabs.forEach(t => {
     const el = document.createElement('div');
@@ -780,6 +792,9 @@ function buildNav() {
 }
 
 function showPage(id) {
+  if (id === 'page-admin' && currentUser.role !== 'admin') {
+    toast('Acesso restrito ao administrador','error'); return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.page === id);
@@ -869,7 +884,7 @@ function renderOrders() {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
           ${statusLabel(o.status)}
-          ${!isArchived ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();archiveOrder('${o.id}','${o.item_description.replace(/'/g,"\'")}')">🗄 Arquivar</button>` : `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();unarchiveOrder('${o.id}')">↩ Restaurar</button>`}
+          ${(currentUser.role==='admin'||currentUser.role==='solicitante') ? (!isArchived ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();archiveOrder('${o.id}','${o.item_description.replace(/'/g,"\'")}')">🗄 Arquivar</button>` : `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();unarchiveOrder('${o.id}')">↩ Restaurar</button>`) : ''}
         </div>
       </div>
       <div class="info-grid">
@@ -896,6 +911,23 @@ async function viewOrder(id) {
 
   let pickupSig = o.pickup_signature ? `<img src="${o.pickup_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">` : '<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
   let deliverySig = o.delivery_signature ? `<img src="${o.delivery_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">` : '<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
+
+  // Store current order for PDF and delete
+  window._currentViewOrder = o;
+
+  // Add delete button for admin
+  const vFooter = document.getElementById('view-footer');
+  if (vFooter) {
+    const existingDel = vFooter.querySelector('.btn-danger');
+    if (existingDel) existingDel.remove();
+    if (currentUser.role === 'admin') {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-danger';
+      delBtn.textContent = '🗑 Excluir Permanente';
+      delBtn.onclick = () => deleteOrderPermanent(o.id, o.item_description);
+      vFooter.insertBefore(delBtn, vFooter.firstChild);
+    }
+  }
 
   document.getElementById('view-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1256,6 +1288,147 @@ function getSigData(canvasId) {
   const entry = sigCanvases[canvasId];
   if (!entry || !entry.hasDraw()) return null;
   return entry.canvas.toDataURL('image/png');
+}
+
+// ── DELETE PERMANENT (admin only) ──
+async function deleteOrderPermanent(id, name) {
+  if (!confirm(`⚠️ Excluir permanentemente a ordem "${name}"?\n\nEssa ação não pode ser desfeita. O registro será removido completamente do banco.`)) return;
+  const { error } = await sb.from('orders').delete().eq('id', id);
+  if (error) { toast('Erro ao excluir: '+error.message,'error'); return; }
+  toast('Ordem excluída permanentemente','info');
+  closeModal('modal-view');
+  loadDashboard();
+}
+
+// ── PDF RECIBO ──
+function downloadRecibo() {
+  const o = window._currentViewOrder;
+  if (!o) return;
+
+  const statusMap = {pendente:'Pendente', coletado:'Coletado', entregue:'Entregue', problema:'Problema - Divergência', arquivado:'Arquivado'};
+  const now = new Date().toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'});
+
+  let photoSection = '';
+  if (o.delivery_photo_url) {
+    photoSection = `<div class="section-title">Foto da Entrega</div>
+    <img src="${o.delivery_photo_url}" style="max-width:100%;max-height:250px;border-radius:6px;border:1px solid #ddd;margin-top:8px;">`;
+  }
+
+  let pickupSigSection = o.pickup_signature
+    ? `<img src="${o.pickup_signature}" style="max-height:70px;border:1px solid #ddd;border-radius:4px;margin-top:6px;">`
+    : '<span style="color:#999;font-size:12px;">Não registrada</span>';
+
+  let deliverySigSection = o.delivery_signature
+    ? `<img src="${o.delivery_signature}" style="max-height:70px;border:1px solid #ddd;border-radius:4px;margin-top:6px;">`
+    : '<span style="color:#999;font-size:12px;">Não registrada</span>';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Recibo — ${o.item_description}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #fff; padding: 32px; max-width: 720px; margin: 0 auto; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #f97316; padding-bottom: 16px; margin-bottom: 24px; }
+  .brand { font-size: 20px; font-weight: 700; color: #f97316; }
+  .brand-sub { font-size: 11px; color: #888; margin-top: 3px; }
+  .doc-info { text-align: right; }
+  .doc-title { font-size: 15px; font-weight: 700; }
+  .doc-date { font-size: 11px; color: #888; margin-top: 4px; }
+  .status-badge { display:inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .status-pendente { background: #fef9c3; color: #854d0e; }
+  .status-coletado { background: #dbeafe; color: #1e3a8a; }
+  .status-entregue { background: #dcfce7; color: #14532d; }
+  .status-problema { background: #fee2e2; color: #7f1d1d; }
+  .status-arquivado { background: #f3f4f6; color: #6b7280; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #888; margin: 20px 0 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-label { font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing:.04em; margin-bottom:3px; }
+  .field-value { font-size: 13px; font-weight: 500; }
+  .confirm-row { display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+  .confirm-item { font-size: 12px; }
+  .notes-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; margin-top:8px; font-size:12px; color:#444; }
+  .sig-row { display:flex; gap:32px; margin-top:16px; }
+  .sig-block { flex:1; }
+  .footer { margin-top: 32px; border-top: 1px solid #eee; padding-top: 14px; display:flex; justify-content:space-between; font-size:11px; color:#aaa; }
+  @media print { body { padding: 20px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="brand">KM Entregas</div>
+    <div class="brand-sub">Controle de Coleta e Entrega</div>
+  </div>
+  <div class="doc-info">
+    <div class="doc-title">Recibo de Entrega</div>
+    <div class="doc-date">Emitido em ${now}</div>
+    <div style="margin-top:8px;"><span class="status-badge status-${o.status}">${statusMap[o.status]||o.status}</span></div>
+  </div>
+</div>
+
+<div class="section-title">Dados da Ordem</div>
+<div class="grid">
+  <div><div class="field-label">Item</div><div class="field-value">${o.item_description}</div></div>
+  <div><div class="field-label">Quantidade</div><div class="field-value">${o.quantity}</div></div>
+  <div><div class="field-label">Data de Entrega</div><div class="field-value">${o.delivery_scheduled_date ? o.delivery_scheduled_date.split('-').reverse().join('/') : '—'}</div></div>
+  <div><div class="field-label">Ordem criada em</div><div class="field-value">${new Date(o.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</div></div>
+</div>
+
+<div class="section-title">Coleta</div>
+<div class="grid">
+  <div><div class="field-label">Endereço</div><div class="field-value">${o.pickup_address}</div></div>
+  <div><div class="field-label">Horário previsto</div><div class="field-value">${o.pickup_time}</div></div>
+  <div><div class="field-label">Responsável</div><div class="field-value">${o.pickup_responsible}</div></div>
+  <div><div class="field-label">Coletado por</div><div class="field-value">${o.collector_name||'—'}</div></div>
+  <div><div class="field-label">Horário real da coleta</div><div class="field-value">${o.pickup_timestamp ? new Date(o.pickup_timestamp).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—'}</div></div>
+</div>
+${o.item_confirmed !== null ? `
+<div class="confirm-row">
+  <div class="confirm-item">${o.item_confirmed ? '✅ Item conforme' : '⚠️ Item com divergência'}</div>
+  <div class="confirm-item">${o.quantity_confirmed ? '✅ Quantidade conforme' : '⚠️ Quantidade com divergência'}</div>
+</div>` : ''}
+${o.pickup_notes ? `<div class="notes-box"><strong>Obs. coleta:</strong> ${o.pickup_notes}</div>` : ''}
+
+<div class="section-title">Entrega</div>
+<div class="grid">
+  <div><div class="field-label">Endereço</div><div class="field-value">${o.delivery_address}</div></div>
+  <div><div class="field-label">Horário previsto</div><div class="field-value">${o.delivery_scheduled_time}</div></div>
+  <div><div class="field-label">Responsável</div><div class="field-value">${o.delivery_responsible}</div></div>
+  <div><div class="field-label">Recebido por</div><div class="field-value">${o.receiver_name||'—'}</div></div>
+  <div><div class="field-label">Entregue em</div><div class="field-value">${o.delivery_timestamp ? new Date(o.delivery_timestamp).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—'}</div></div>
+</div>
+${o.delivery_notes ? `<div class="notes-box"><strong>Obs. entrega:</strong> ${o.delivery_notes}</div>` : ''}
+
+<div class="sig-row">
+  <div class="sig-block">
+    <div class="field-label" style="margin-bottom:6px;">Rubrica — Coleta</div>
+    ${pickupSigSection}
+  </div>
+  <div class="sig-block">
+    <div class="field-label" style="margin-bottom:6px;">Rubrica — Entrega</div>
+    ${deliverySigSection}
+  </div>
+</div>
+
+${photoSection}
+
+<div class="footer">
+  <span>KM Entregas — klebermesquita.github.io/km-entregas</span>
+  <span>Documento gerado automaticamente</span>
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `recibo_${o.item_description.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${o.delivery_scheduled_date||'sem_data'}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Recibo baixado! Abra o arquivo e use Ctrl+P para salvar como PDF.','info');
 }
 
 // ── USERS ──
