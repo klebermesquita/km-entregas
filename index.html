@@ -498,13 +498,21 @@ async function doLogin() {
 
   // Bootstrap superadmin
   if (email==='km@admin.com' && password==='km2025super') {
-    const {data:ex} = await sb.from('users').select('id').eq('email','km@admin.com').maybeSingle();
+    const {data:ex} = await sb.from('users').select('id,email').eq('email','km@admin.com').maybeSingle();
     if (!ex) await sb.from('users').insert({email:'km@admin.com',password_hash:hashPass('km2025super'),name:'KM Admin',role:'superadmin'});
   }
 
-  const {data,error} = await sb.from('users').select('*,companies(*),carriers(*)').eq('email',email).maybeSingle();
-  if (error||!data) { toast('Usuário não encontrado','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
-  if (data.password_hash!==hashPass(password)) { toast('Senha incorreta','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
+  // Usa função segura que não expõe password_hash
+  const {data:loginData, error:loginErr} = await sb.rpc('validate_user_login', {
+    p_email: email,
+    p_hash: hashPass(password)
+  });
+  if (loginErr||!loginData||loginData.length===0) {
+    toast('Email ou senha incorretos','error'); btn.disabled=false; btn.textContent='Entrar'; return;
+  }
+  // Buscar dados completos (sem hash) com joins
+  const {data,error} = await sb.from('users').select('id,email,name,role,company_id,carrier_id,created_at,companies(*),carriers(*)').eq('email',email).maybeSingle();
+  if (error||!data) { toast('Erro ao carregar usuário','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
 
   // Check active
   if (data.role!=='superadmin') {
@@ -512,8 +520,11 @@ async function doLogin() {
     if (data.carriers && !data.carriers.active) { toast('Transportadora inativa. Contate o suporte.','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
   }
 
-  CU = data;
-  sessionStorage.setItem('km_user', JSON.stringify(data));
+  // Armazena sem password_hash na sessão
+  const safeUser = {...data};
+  delete safeUser.password_hash;
+  CU = safeUser;
+  sessionStorage.setItem('km_user', JSON.stringify(safeUser));
   showApp();
   btn.disabled=false; btn.textContent='Entrar';
 }
@@ -1432,10 +1443,11 @@ async function submitChangePassword() {
     if(error){toast('Erro: '+error.message,'error');return;}
     toast('Senha resetada com sucesso!','success');
   } else {
-    // User changing own password
+    // User changing own password — validate current via RPC
     const currentPass = document.getElementById('pass-current').value;
     if(!currentPass){toast('Informe a senha atual','error');return;}
-    if(hashPass(currentPass)!==CU.password_hash){toast('Senha atual incorreta','error');return;}
+    const {data:valid}=await sb.rpc('validate_user_login',{p_email:CU.email,p_hash:hashPass(currentPass)});
+    if(!valid||valid.length===0){toast('Senha atual incorreta','error');return;}
     const {error}=await sb.from('users').update({password_hash:hashPass(newPass)}).eq('id',CU.id);
     if(error){toast('Erro: '+error.message,'error');return;}
     CU.password_hash=hashPass(newPass);
