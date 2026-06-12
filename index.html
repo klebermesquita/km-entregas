@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KM Entregas — Controle de Entregas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0f0f10;
+    --surface: #18181b;
+    --surface2: #1f1f23;
+    --border: #2a2a30;
+    --border2: #3a3a42;
+    --accent: #f97316;
+    --accent-dim: rgba(249,115,22,0.12);
+    --accent-hover: #ea6b0c;
+    --text: #f4f4f5;
+    --text-muted: #71717a;
+    --text-dim: #a1a1aa;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --yellow: #eab308;
+    --yellow-dim: rgba(234,179,8,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    padding: 12px 18px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500; opacity: 0;
+    transition: opacity .3s; pointer-events: none;
+    max-width: 320px;
+  }
+  #toast.show { opacity: 1; }
+  #toast.success { background: var(--green); color: #000; }
+  #toast.error { background: var(--red); color: #fff; }
+  #toast.info { background: var(--accent); color: #fff; }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    width: 100%; max-width: 380px;
+  }
+  .login-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: .15em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .login-title {
+    font-size: 22px; font-weight: 700; margin-bottom: 6px; color: var(--text);
+  }
+  .login-sub { color: var(--text-muted); font-size: 13px; margin-bottom: 32px; }
+
+  /* ── FORMS ── */
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--text-dim); letter-spacing: .04em; text-transform: uppercase; }
+  .field input, .field select, .field textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+  }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field select option { background: var(--surface2); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border-radius: var(--radius-sm);
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; transition: all .15s; letter-spacing: .02em;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid transparent; }
+  .btn-danger:hover { border-color: var(--red); }
+  .btn-success { background: var(--green-dim); color: var(--green); border: 1px solid transparent; }
+  .btn-success:hover { border-color: var(--green); }
+  .btn-full { width: 100%; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── APP SHELL ── */
+  #app { display: none; min-height: 100vh; flex-direction: column; }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .topbar-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: .15em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .topbar-sep { width: 1px; height: 20px; background: var(--border); }
+  .topbar-title { font-size: 13px; font-weight: 500; color: var(--text-dim); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 12px 4px 4px;
+  }
+  .user-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent-dim); border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--accent);
+  }
+  .user-name { font-size: 12px; font-weight: 500; }
+  .role-pill {
+    font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 10px;
+  }
+  .role-solicitante { background: var(--blue-dim); color: var(--blue); }
+  .role-transportadora { background: var(--yellow-dim); color: var(--yellow); }
+
+  /* ── NAV TABS ── */
+  .nav-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; gap: 0;
+  }
+  .nav-tab {
+    padding: 14px 18px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s; white-space: nowrap;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── CONTENT ── */
+  .content { padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  /* ── PAGE ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+  .page-header h1 { font-size: 20px; font-weight: 700; }
+  .page-header p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 16px; gap: 12px;
+  }
+  .card-title { font-size: 15px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── STATUS BADGE ── */
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-pendente { background: var(--yellow-dim); color: var(--yellow); }
+  .status-coletado { background: var(--blue-dim); color: var(--blue); }
+  .status-entregue { background: var(--green-dim); color: var(--green); }
+  .status-problema { background: var(--red-dim); color: var(--red); }
+
+  /* ── INFO GRID ── */
+  .info-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .info-item { display: flex; flex-direction: column; gap: 3px; }
+  .info-label {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .info-value { font-size: 13px; font-weight: 500; color: var(--text); }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── CHECKBOX ROWS ── */
+  .check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .check-row:last-child { border-bottom: none; }
+  .check-row input[type=checkbox] {
+    width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+  }
+  .check-row label { font-size: 13px; cursor: pointer; }
+  .check-group { display: flex; gap: 16px; flex-wrap: wrap; }
+  .check-option { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check-option input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+  .check-option label { font-size: 13px; cursor: pointer; }
+
+  /* ── SIGNATURE CANVAS ── */
+  .sig-wrapper {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+  }
+  .sig-wrapper canvas { display: block; cursor: crosshair; touch-action: none; }
+  .sig-actions {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .sig-placeholder {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: var(--text-muted); font-size: 12px; pointer-events: none;
+  }
+
+  /* ── PHOTO UPLOAD ── */
+  .photo-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .photo-area:hover { border-color: var(--accent); }
+  .photo-area p { color: var(--text-muted); font-size: 13px; margin-top: 8px; }
+  .photo-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius-sm); margin-top: 12px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+    align-items: flex-start; justify-content: center;
+    padding: 20px; overflow-y: auto;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%; max-width: 640px;
+    margin: auto;
+  }
+  .modal-header {
+    padding: 20px 24px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-header h2 { font-size: 17px; font-weight: 700; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+
+  /* ── FORM GRID ── */
+  .form-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;
+  }
+  .form-grid .span2 { grid-column: span 2; }
+  @media (max-width: 540px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .form-grid .span2 { grid-column: span 1; }
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    text-align: center; padding: 48px 24px; color: var(--text-muted);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty h3 { font-size: 15px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+  .empty p { font-size: 13px; }
+
+  /* ── TIMESTAMP ── */
+  .timestamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+  }
+
+  /* ── FILTERS ── */
+  .filters {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; align-items: center;
+  }
+  .filter-btn {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: transparent;
+    color: var(--text-muted); transition: all .15s;
+  }
+  .filter-btn:hover, .filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 700; }
+  .stat-value.orange { color: var(--accent); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.red { color: var(--red); }
+
+  @media (max-width: 600px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .topbar { padding: 0 16px; }
+    .content { padding: 16px; }
+    .nav-tabs { padding: 0 16px; overflow-x: auto; }
+    .modal-body, .modal-header, .modal-footer { padding-left: 16px; padding-right: 16px; }
+  }
+
+  .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  /* ── ADMIN ── */
+  .user-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-row-info { display: flex; align-items: center; gap: 12px; }
+  .user-row-name { font-size: 14px; font-weight: 500; }
+  .user-row-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .timeline {
+    display: flex; flex-direction: column; gap: 0;
+    margin: 12px 0;
+  }
+  .timeline-item {
+    display: flex; gap: 14px; padding-bottom: 16px; position: relative;
+  }
+  .timeline-item::before {
+    content: ''; position: absolute; left: 15px; top: 28px;
+    width: 2px; height: calc(100% - 12px); background: var(--border);
+  }
+  .timeline-item:last-child::before { display: none; }
+  .timeline-dot {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; border: 2px solid var(--border);
+    background: var(--surface2); z-index: 1;
+  }
+  .timeline-dot.done { border-color: var(--green); background: var(--green-dim); }
+  .timeline-dot.current { border-color: var(--accent); background: var(--accent-dim); }
+  .timeline-content { flex: 1; padding-top: 4px; }
+  .timeline-title { font-size: 13px; font-weight: 600; }
+  .timeline-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">KM Entregas</div>
+    <div class="login-title">Controle de Entregas</div>
+    <div class="login-sub">Faça login para continuar</div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="login-user" placeholder="seu usuário" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()" id="login-btn">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo">KM Entregas</div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-title">Controle de Entregas</div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-badge">
+        <div class="user-avatar" id="topbar-avatar">K</div>
+        <div class="user-name" id="topbar-username">—</div>
+      </div>
+      <span class="role-pill" id="topbar-role">—</span>
+      <button class="btn btn-ghost" onclick="doLogout()" style="padding:6px 12px;">Sair</button>
+    </div>
+  </div>
+
+  <div class="nav-tabs" id="nav-tabs"></div>
+
+  <div class="content">
+    <!-- SOLICITANTE: Dashboard -->
+    <div class="page" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1>Visão Geral</h1>
+          <p>Resumo de todas as ordens</p>
+        </div>
+        <button class="btn btn-primary" onclick="openNewOrderModal()">+ Nova Ordem</button>
+      </div>
+      <div class="stats-row" id="stats-row"></div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">Todas</button>
+        <button class="filter-btn" data-filter="pendente" onclick="setFilter('pendente',this)">Pendentes</button>
+        <button class="filter-btn" data-filter="coletado" onclick="setFilter('coletado',this)">Coletadas</button>
+        <button class="filter-btn" data-filter="entregue" onclick="setFilter('entregue',this)">Entregues</button>
+        <button class="filter-btn" data-filter="problema" onclick="setFilter('problema',this)">Problemas</button>
+      </div>
+      <div id="orders-list"></div>
+    </div>
+
+    <!-- SOLICITANTE: Nova Ordem -->
+    <div class="page" id="page-nova">
+      <div class="page-header">
+        <div><h1>Nova Ordem</h1><p>Cadastre uma coleta e entrega</p></div>
+      </div>
+      <div class="card">
+        <div id="new-order-form"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+          <button class="btn btn-ghost" onclick="showPage('page-dashboard')">Cancelar</button>
+          <button class="btn btn-primary" onclick="submitNewOrder()">Criar Ordem</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSPORTADORA: Lista do dia -->
+    <div class="page" id="page-transporte">
+      <div class="page-header">
+        <div><h1>Ordens do Dia</h1><p id="today-label">—</p></div>
+        <button class="btn btn-ghost" onclick="loadTransportOrders()">↻ Atualizar</button>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilterT('all',this)">Todas</button>
+        <button class="filter-btn" data-filter="pendente" onclick="setFilterT('pendente',this)">Pendentes</button>
+        <button class="filter-btn" data-filter="coletado" onclick="setFilterT('coletado',this)">Coletadas</button>
+        <button class="filter-btn" data-filter="entregue" onclick="setFilterT('entregue',this)">Entregues</button>
+      </div>
+      <div id="transport-list"></div>
+    </div>
+
+    <!-- ADMIN: Usuários -->
+    <div class="page" id="page-admin">
+      <div class="page-header">
+        <div><h1>Usuários</h1><p>Gerenciar acesso ao sistema</p></div>
+        <button class="btn btn-primary" onclick="openNewUserModal()">+ Novo Usuário</button>
+      </div>
+      <div class="card" id="users-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nova Ordem -->
+<div class="modal-overlay" id="modal-order">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nova Ordem de Coleta/Entrega</h2>
+      <button class="modal-close" onclick="closeModal('modal-order')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field span2">
+          <label>Descrição do Item</label>
+          <input type="text" id="o-item" placeholder="Ex: Cenário de palco, maleta de produtos...">
+        </div>
+        <div class="field">
+          <label>Quantidade</label>
+          <input type="number" id="o-qty" min="1" value="1">
+        </div>
+        <div class="field">
+          <label>Data da Entrega</label>
+          <input type="date" id="o-date">
+        </div>
+        <div class="field span2">
+          <label>Endereço de Coleta</label>
+          <input type="text" id="o-pickup-addr" placeholder="Rua, número, bairro, cidade">
+        </div>
+        <div class="field">
+          <label>Horário de Coleta</label>
+          <input type="time" id="o-pickup-time">
+        </div>
+        <div class="field">
+          <label>Responsável na Coleta</label>
+          <input type="text" id="o-pickup-resp" placeholder="Nome do responsável">
+        </div>
+        <div class="field span2">
+          <label>Endereço de Entrega</label>
+          <input type="text" id="o-delivery-addr" placeholder="Rua, número, bairro, cidade">
+        </div>
+        <div class="field">
+          <label>Horário de Entrega</label>
+          <input type="time" id="o-delivery-time">
+        </div>
+        <div class="field">
+          <label>Responsável pelo Recebimento</label>
+          <input type="text" id="o-delivery-resp" placeholder="Nome do responsável">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-order')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createOrder()">Criar Ordem</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Detalhe da Ordem (Transportadora) -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="detail-title">Ordem</h2>
+      <button class="modal-close" onclick="closeModal('modal-detail')">×</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL: Detalhe Solicitante -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="view-title">Detalhes da Ordem</h2>
+      <button class="modal-close" onclick="closeModal('modal-view')">×</button>
+    </div>
+    <div class="modal-body" id="view-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-view')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Usuário -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Novo Usuário</h2>
+      <button class="modal-close" onclick="closeModal('modal-user')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nome de Usuário</label>
+        <input type="text" id="u-name" placeholder="ex: joao.silva">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="u-pass" placeholder="mínimo 6 caracteres">
+      </div>
+      <div class="field">
+        <label>Perfil</label>
+        <select id="u-role">
+          <option value="solicitante">Solicitante</option>
+          <option value="transportadora">Transportadora</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createUser()">Criar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ccwamzabidwvjtblcxxe.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Zd4exOz1Qo9zDfGyJgpa1Q_GE7aPJfQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let allOrders = [];
+let allOrdersT = [];
+let currentFilter = 'all';
+let currentFilterT = 'all';
+let activeOrderId = null;
+let sigCanvases = {};
+
+// ── UTILS ──
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 3000);
+}
+
+function hashPass(p) {
+  let h = 0;
+  for (let i = 0; i < p.length; i++) { h = ((h << 5) - h) + p.charCodeAt(i); h |= 0; }
+  return 'h_' + Math.abs(h).toString(36) + p.length;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('pt-BR', {timeZone: 'America/Sao_Paulo', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+function fmtDateOnly(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+function todayISO() {
+  return new Date().toLocaleDateString('sv-SE', {timeZone: 'America/Sao_Paulo'});
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+function statusLabel(s) {
+  const map = {pendente:'Pendente', coletado:'Coletado', entregue:'Entregue', problema:'Problema'};
+  return `<span class="status status-${s}">${map[s]||s}</span>`;
+}
+
+// ── AUTH ──
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!username || !password) { toast('Preencha usuário e senha','error'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Entrando...';
+
+  // Check for default admin on first run
+  if (username === 'admin' && password === 'faro2025') {
+    const { data } = await sb.from('users').select('*').eq('username','admin').single();
+    if (!data) {
+      await sb.from('users').insert({username:'admin', password_hash: hashPass('faro2025'), role:'solicitante'});
+    }
+  }
+
+  const { data, error } = await sb.from('users').select('*').eq('username', username).single();
+  if (error || !data) { toast('Usuário não encontrado','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
+  if (data.password_hash !== hashPass(password)) { toast('Senha incorreta','error'); btn.disabled=false; btn.textContent='Entrar'; return; }
+
+  currentUser = data;
+  sessionStorage.setItem('user', JSON.stringify(data));
+  showApp();
+  btn.disabled=false; btn.textContent='Entrar';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-pass').focus(); });
+
+function doLogout() {
+  currentUser = null;
+  sessionStorage.removeItem('user');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ── APP INIT ──
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+
+  document.getElementById('topbar-username').textContent = currentUser.username;
+  document.getElementById('topbar-avatar').textContent = currentUser.username[0].toUpperCase();
+  const rp = document.getElementById('topbar-role');
+  rp.textContent = currentUser.role;
+  rp.className = `role-pill role-${currentUser.role}`;
+
+  buildNav();
+  const first = currentUser.role === 'transportadora' ? 'page-transporte' : 'page-dashboard';
+  showPage(first);
+}
+
+function buildNav() {
+  const nav = document.getElementById('nav-tabs');
+  nav.innerHTML = '';
+  const tabs = currentUser.role === 'transportadora'
+    ? [{id:'page-transporte',label:'Minhas Ordens'}]
+    : [
+        {id:'page-dashboard',label:'Dashboard'},
+        {id:'page-admin',label:'Usuários'}
+      ];
+
+  tabs.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'nav-tab';
+    el.textContent = t.label;
+    el.onclick = () => showPage(t.id);
+    el.dataset.page = t.id;
+    nav.appendChild(el);
+  });
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.page === id);
+  });
+  document.getElementById(id).classList.add('active');
+  if (id === 'page-dashboard') loadDashboard();
+  if (id === 'page-transporte') loadTransportOrders();
+  if (id === 'page-admin') loadUsers();
+}
+
+// ── DASHBOARD ──
+async function loadDashboard() {
+  const { data } = await sb.from('orders').select('*').order('delivery_scheduled_date', {ascending:false});
+  allOrders = data || [];
+  renderStats();
+  renderOrders();
+}
+
+function renderStats() {
+  const total = allOrders.length;
+  const pendente = allOrders.filter(o=>o.status==='pendente').length;
+  const coletado = allOrders.filter(o=>o.status==='coletado').length;
+  const entregue = allOrders.filter(o=>o.status==='entregue').length;
+  const problema = allOrders.filter(o=>o.status==='problema').length;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value orange">${pendente}</div></div>
+    <div class="stat-card"><div class="stat-label">Entregues</div><div class="stat-value green">${entregue}</div></div>
+    <div class="stat-card"><div class="stat-label">Problemas</div><div class="stat-value red">${problema}</div></div>
+  `;
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('#page-dashboard .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter===f));
+  renderOrders();
+}
+
+function renderOrders() {
+  const list = document.getElementById('orders-list');
+  let orders = currentFilter === 'all' ? allOrders : allOrders.filter(o=>o.status===currentFilter);
+  if (!orders.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">📦</div><h3>Nenhuma ordem</h3><p>Crie uma nova ordem para começar</p></div>`;
+    return;
+  }
+  list.innerHTML = orders.map(o => `
+    <div class="card" style="cursor:pointer" onclick="viewOrder('${o.id}')">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">Entrega: ${fmtDateOnly(o.delivery_scheduled_date)} às ${o.delivery_scheduled_time} · Qtd: ${o.quantity}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Responsável coleta</div><div class="info-value">${o.pickup_responsible}</div></div>
+        <div class="info-item"><div class="info-label">Responsável entrega</div><div class="info-value">${o.delivery_responsible}</div></div>
+      </div>
+      ${o.delivery_timestamp ? `<div class="timestamp">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── VIEW ORDER (Solicitante) ──
+async function viewOrder(id) {
+  const { data: o } = await sb.from('orders').select('*').eq('id',id).single();
+  if (!o) return;
+  document.getElementById('view-title').textContent = o.item_description;
+
+  let photoHtml = '';
+  if (o.delivery_photo_url) {
+    photoHtml = `<img src="${o.delivery_photo_url}" class="photo-preview" style="max-width:100%;margin-top:8px;">`;
+  }
+
+  let pickupSig = o.pickup_signature ? `<img src="${o.pickup_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">` : '<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
+  let deliverySig = o.delivery_signature ? `<img src="${o.delivery_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">` : '<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
+
+  document.getElementById('view-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      ${statusLabel(o.status)}
+      <span class="timestamp">Criada em ${fmtDate(o.created_at)}</span>
+    </div>
+
+    <div class="section-label">Dados da Ordem</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Item</div><div class="info-value">${o.item_description}</div></div>
+      <div class="info-item"><div class="info-label">Quantidade</div><div class="info-value">${o.quantity}</div></div>
+      <div class="info-item"><div class="info-label">Data Entrega</div><div class="info-value">${fmtDateOnly(o.delivery_scheduled_date)}</div></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Coleta</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Endereço</div><div class="info-value">${o.pickup_address}</div></div>
+      <div class="info-item"><div class="info-label">Horário</div><div class="info-value">${o.pickup_time}</div></div>
+      <div class="info-item"><div class="info-label">Responsável</div><div class="info-value">${o.pickup_responsible}</div></div>
+      ${o.collector_name ? `<div class="info-item"><div class="info-label">Coletado por</div><div class="info-value">${o.collector_name}</div></div>` : ''}
+      ${o.pickup_timestamp ? `<div class="info-item"><div class="info-label">Horário real coleta</div><div class="info-value timestamp">${fmtDate(o.pickup_timestamp)}</div></div>` : ''}
+    </div>
+    ${o.item_confirmed !== null ? `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+      <span style="font-size:12px;">${o.item_confirmed ? '✅ Item confirmado' : '⚠️ Item com divergência'}</span>
+      <span style="font-size:12px;">${o.quantity_confirmed ? '✅ Quantidade confirmada' : '⚠️ Quantidade com divergência'}</span>
+    </div>` : ''}
+    ${o.pickup_notes ? `<div style="margin-top:8px;"><span class="info-label">Obs. coleta:</span> <span style="font-size:13px;">${o.pickup_notes}</span></div>` : ''}
+    <div style="margin-top:8px;"><span class="info-label">Rubrica coleta:</span><br>${pickupSig}</div>
+
+    <div class="divider"></div>
+    <div class="section-label">Entrega</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Endereço</div><div class="info-value">${o.delivery_address}</div></div>
+      <div class="info-item"><div class="info-label">Horário previsto</div><div class="info-value">${o.delivery_scheduled_time}</div></div>
+      <div class="info-item"><div class="info-label">Responsável</div><div class="info-value">${o.delivery_responsible}</div></div>
+      ${o.receiver_name ? `<div class="info-item"><div class="info-label">Recebido por</div><div class="info-value">${o.receiver_name}</div></div>` : ''}
+      ${o.delivery_timestamp ? `<div class="info-item"><div class="info-label">Entregue em</div><div class="info-value timestamp">${fmtDate(o.delivery_timestamp)}</div></div>` : ''}
+    </div>
+    ${o.delivery_notes ? `<div style="margin-top:8px;"><span class="info-label">Obs. entrega:</span> <span style="font-size:13px;">${o.delivery_notes}</span></div>` : ''}
+    <div style="margin-top:8px;"><span class="info-label">Rubrica entrega:</span><br>${deliverySig}</div>
+    ${photoHtml ? `<div style="margin-top:12px;"><div class="info-label">Foto da entrega</div>${photoHtml}</div>` : ''}
+  `;
+  openModal('modal-view');
+}
+
+// ── CREATE ORDER ──
+function openNewOrderModal() {
+  document.getElementById('o-date').value = todayISO();
+  openModal('modal-order');
+}
+
+async function createOrder() {
+  const item = document.getElementById('o-item').value.trim();
+  const qty = parseInt(document.getElementById('o-qty').value);
+  const date = document.getElementById('o-date').value;
+  const pAddr = document.getElementById('o-pickup-addr').value.trim();
+  const pTime = document.getElementById('o-pickup-time').value;
+  const pResp = document.getElementById('o-pickup-resp').value.trim();
+  const dAddr = document.getElementById('o-delivery-addr').value.trim();
+  const dTime = document.getElementById('o-delivery-time').value;
+  const dResp = document.getElementById('o-delivery-resp').value.trim();
+
+  if (!item||!qty||!date||!pAddr||!pTime||!pResp||!dAddr||!dTime||!dResp) {
+    toast('Preencha todos os campos','error'); return;
+  }
+
+  const { error } = await sb.from('orders').insert({
+    created_by: currentUser.id,
+    item_description: item, quantity: qty,
+    pickup_address: pAddr, pickup_time: pTime, pickup_responsible: pResp,
+    delivery_address: dAddr, delivery_responsible: dResp,
+    delivery_scheduled_time: dTime, delivery_scheduled_date: date
+  });
+
+  if (error) { toast('Erro ao criar ordem: '+error.message,'error'); return; }
+  toast('Ordem criada!','success');
+  closeModal('modal-order');
+  // Clear fields
+  ['o-item','o-pickup-addr','o-pickup-time','o-pickup-resp','o-delivery-addr','o-delivery-time','o-delivery-resp'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('o-qty').value=1;
+  loadDashboard();
+}
+
+// ── TRANSPORT ──
+function setFilterT(f, el) {
+  currentFilterT = f;
+  document.querySelectorAll('#page-transporte .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter===f));
+  renderTransportOrders();
+}
+
+async function loadTransportOrders() {
+  const today = todayISO();
+  document.getElementById('today-label').textContent = 'Data: ' + fmtDateOnly(today);
+  const { data } = await sb.from('orders').select('*').eq('delivery_scheduled_date', today).order('pickup_time');
+  allOrdersT = data || [];
+  renderTransportOrders();
+}
+
+function renderTransportOrders() {
+  const list = document.getElementById('transport-list');
+  let orders = currentFilterT === 'all' ? allOrdersT : allOrdersT.filter(o=>o.status===currentFilterT);
+  if (!orders.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">🚚</div><h3>Sem ordens para hoje</h3><p>Nenhuma entrega agendada para esta data</p></div>`;
+    return;
+  }
+  list.innerHTML = orders.map(o => `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">Qtd: ${o.quantity} · Coleta: ${o.pickup_time} · Entrega: ${o.delivery_scheduled_time}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Endereço de Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Responsável Coleta</div><div class="info-value">${o.pickup_responsible}</div></div>
+        <div class="info-item"><div class="info-label">Endereço de Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Responsável Entrega</div><div class="info-value">${o.delivery_responsible}</div></div>
+      </div>
+      <div class="actions-row">
+        ${o.status === 'pendente' ? `<button class="btn btn-primary" onclick="openCollectModal('${o.id}')">Registrar Coleta</button>` : ''}
+        ${o.status === 'coletado' ? `<button class="btn btn-success" onclick="openDeliveryModal('${o.id}')">Registrar Entrega</button>` : ''}
+        ${o.status === 'entregue' ? `<span style="color:var(--green);font-size:13px;">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── COLLECT MODAL ──
+function openCollectModal(orderId) {
+  activeOrderId = orderId;
+  const o = allOrdersT.find(x=>x.id===orderId);
+  document.getElementById('detail-title').textContent = 'Registrar Coleta — ' + o.item_description;
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="section-label">Confirmações</div>
+
+    <div class="field">
+      <label>Nome do Entregador / Motorista</label>
+      <input type="text" id="d-collector" placeholder="Seu nome completo">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Item coletado é o que foi solicitado?</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="item-conf" value="yes"> <span>✅ Sim, conforme</span></label>
+        <label class="check-option"><input type="radio" name="item-conf" value="no"> <span>⚠️ Não conforme</span></label>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Quantidade coletada bate com o solicitado? (${o.quantity} unid.)</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="qty-conf" value="yes"> <span>✅ Sim, correta</span></label>
+        <label class="check-option"><input type="radio" name="qty-conf" value="no"> <span>⚠️ Quantidade diferente</span></label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Observações (opcional)</label>
+      <textarea id="d-pickup-notes" placeholder="Ex: Faltaram 2 unidades porque o fornecedor não tinha disponível..."></textarea>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Rubrica de Coleta</div>
+    <div class="sig-wrapper" style="position:relative;">
+      <canvas id="sig-collect" width="560" height="140" style="width:100%;height:140px;"></canvas>
+      <div class="sig-placeholder" id="sig-collect-ph">Assine aqui</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn btn-ghost" onclick="clearSig('sig-collect')">Limpar assinatura</button>
+    </div>
+  `;
+
+  document.getElementById('detail-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitCollect()">Confirmar Coleta</button>
+  `;
+
+  openModal('modal-detail');
+  setTimeout(() => initSig('sig-collect'), 100);
+}
+
+// ── DELIVERY MODAL ──
+function openDeliveryModal(orderId) {
+  activeOrderId = orderId;
+  const o = allOrdersT.find(x=>x.id===orderId);
+  document.getElementById('detail-title').textContent = 'Registrar Entrega — ' + o.item_description;
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="field">
+      <label>Nome de quem recebeu</label>
+      <input type="text" id="d-receiver" placeholder="Nome do recebedor">
+    </div>
+
+    <div class="field">
+      <label>Observações da Entrega (opcional)</label>
+      <textarea id="d-delivery-notes" placeholder="Observações sobre a entrega..."></textarea>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Rubrica de Entrega</div>
+    <div class="sig-wrapper" style="position:relative;">
+      <canvas id="sig-delivery" width="560" height="140" style="width:100%;height:140px;"></canvas>
+      <div class="sig-placeholder" id="sig-delivery-ph">Assine aqui</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn btn-ghost" onclick="clearSig('sig-delivery')">Limpar assinatura</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Foto da Entrega</div>
+    <div class="photo-area" onclick="document.getElementById('photo-input').click()">
+      <div style="font-size:32px;">📷</div>
+      <p>Toque para tirar foto ou escolher da galeria</p>
+    </div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)">
+    <img id="photo-preview" class="photo-preview" style="display:none;margin-top:12px;">
+  `;
+
+  document.getElementById('detail-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    <button class="btn btn-success" onclick="submitDelivery()">Confirmar Entrega</button>
+  `;
+
+  openModal('modal-detail');
+  setTimeout(() => initSig('sig-delivery'), 100);
+}
+
+function previewPhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById('photo-preview');
+    img.src = ev.target.result; img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SUBMIT COLLECT ──
+async function submitCollect() {
+  const collector = document.getElementById('d-collector').value.trim();
+  const itemConf = document.querySelector('input[name="item-conf"]:checked');
+  const qtyConf = document.querySelector('input[name="qty-conf"]:checked');
+  const notes = document.getElementById('d-pickup-notes').value.trim();
+
+  if (!collector) { toast('Informe o nome do entregador','error'); return; }
+  if (!itemConf) { toast('Confirme o item coletado','error'); return; }
+  if (!qtyConf) { toast('Confirme a quantidade','error'); return; }
+
+  const sigData = getSigData('sig-collect');
+  const hasProb = itemConf.value === 'no' || qtyConf.value === 'no';
+
+  const { error } = await sb.from('orders').update({
+    status: hasProb ? 'problema' : 'coletado',
+    collector_name: collector,
+    item_confirmed: itemConf.value === 'yes',
+    quantity_confirmed: qtyConf.value === 'yes',
+    pickup_notes: notes || null,
+    pickup_signature: sigData || null,
+    pickup_timestamp: new Date().toISOString()
+  }).eq('id', activeOrderId);
+
+  if (error) { toast('Erro: '+error.message,'error'); return; }
+  toast(hasProb ? 'Coleta registrada com problema!' : 'Coleta confirmada!', hasProb ? 'error' : 'success');
+  closeModal('modal-detail');
+  loadTransportOrders();
+}
+
+// ── SUBMIT DELIVERY ──
+async function submitDelivery() {
+  const receiver = document.getElementById('d-receiver').value.trim();
+  const notes = document.getElementById('d-delivery-notes').value.trim();
+  const sigData = getSigData('sig-delivery');
+
+  if (!receiver) { toast('Informe o nome do recebedor','error'); return; }
+
+  let photoUrl = null;
+  const photoInput = document.getElementById('photo-input');
+  if (photoInput.files[0]) {
+    const file = photoInput.files[0];
+    const fileName = `${activeOrderId}_${Date.now()}.jpg`;
+    const { data: upData, error: upErr } = await sb.storage.from('delivery-photos').upload(fileName, file, {contentType: file.type});
+    if (upErr) { toast('Erro ao enviar foto: '+upErr.message,'error'); return; }
+    const { data: urlData } = sb.storage.from('delivery-photos').getPublicUrl(fileName);
+    photoUrl = urlData.publicUrl;
+  }
+
+  const { error } = await sb.from('orders').update({
+    status: 'entregue',
+    receiver_name: receiver,
+    delivery_notes: notes || null,
+    delivery_signature: sigData || null,
+    delivery_photo_url: photoUrl,
+    delivery_timestamp: new Date().toISOString()
+  }).eq('id', activeOrderId);
+
+  if (error) { toast('Erro: '+error.message,'error'); return; }
+  toast('Entrega confirmada! ✓','success');
+  closeModal('modal-detail');
+  loadTransportOrders();
+}
+
+// ── SIGNATURE ──
+function initSig(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const ph = document.getElementById(canvasId+'-ph');
+  let drawing = false;
+  let hasDraw = false;
+
+  // Retina/DPI fix
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = 140 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '140px';
+
+  ctx.strokeStyle = '#f97316';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - r.left, y: src.clientY - r.top };
+  }
+
+  canvas.addEventListener('mousedown', e => { drawing=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
+  canvas.addEventListener('mousemove', e => { if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasDraw=true; if(ph)ph.style.display='none'; });
+  canvas.addEventListener('mouseup', () => drawing=false);
+  canvas.addEventListener('mouseleave', () => drawing=false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }, {passive:false});
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasDraw=true; if(ph)ph.style.display='none'; }, {passive:false});
+  canvas.addEventListener('touchend', () => drawing=false);
+
+  sigCanvases[canvasId] = {canvas, ctx, hasDraw:()=>hasDraw};
+}
+
+function clearSig(canvasId) {
+  const entry = sigCanvases[canvasId];
+  if (!entry) return;
+  const {canvas, ctx} = entry;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const ph = document.getElementById(canvasId+'-ph');
+  if (ph) ph.style.display = '';
+}
+
+function getSigData(canvasId) {
+  const entry = sigCanvases[canvasId];
+  if (!entry || !entry.hasDraw()) return null;
+  return entry.canvas.toDataURL('image/png');
+}
+
+// ── USERS ──
+async function loadUsers() {
+  const { data } = await sb.from('users').select('*').order('created_at');
+  const list = document.getElementById('users-list');
+  if (!data || !data.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">👤</div><h3>Nenhum usuário</h3></div>';
+    return;
+  }
+  list.innerHTML = data.map(u => `
+    <div class="user-row">
+      <div class="user-row-info">
+        <div class="user-avatar" style="width:36px;height:36px;font-size:14px;">${u.username[0].toUpperCase()}</div>
+        <div>
+          <div class="user-row-name">${u.username}</div>
+          <div class="user-row-date">Criado em ${fmtDate(u.created_at)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="role-pill role-${u.role}">${u.role}</span>
+        ${u.id !== currentUser.id ? `<button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${u.id}','${u.username}')">Remover</button>` : '<span style="font-size:11px;color:var(--text-muted);">você</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openNewUserModal() { openModal('modal-user'); }
+
+async function createUser() {
+  const name = document.getElementById('u-name').value.trim().toLowerCase();
+  const pass = document.getElementById('u-pass').value;
+  const role = document.getElementById('u-role').value;
+  if (!name || !pass) { toast('Preencha todos os campos','error'); return; }
+  if (pass.length < 6) { toast('Senha mínima de 6 caracteres','error'); return; }
+
+  const { error } = await sb.from('users').insert({ username:name, password_hash:hashPass(pass), role });
+  if (error) { toast(error.code==='23505' ? 'Usuário já existe' : 'Erro: '+error.message,'error'); return; }
+  toast('Usuário criado!','success');
+  closeModal('modal-user');
+  document.getElementById('u-name').value='';
+  document.getElementById('u-pass').value='';
+  loadUsers();
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Remover usuário "${name}"?`)) return;
+  const { error } = await sb.from('users').delete().eq('id', id);
+  if (error) { toast('Erro: '+error.message,'error'); return; }
+  toast('Usuário removido','info');
+  loadUsers();
+}
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('user');
+  if (saved) { currentUser = JSON.parse(saved); showApp(); }
+});
+</script>
+</body>
+</html>
