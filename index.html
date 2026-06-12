@@ -220,6 +220,30 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="sa-carriers-list"></div>
     </div>
 
+    <!-- SUPERADMIN: Usuários globais -->
+    <div class="page" id="page-sa-users">
+      <div class="page-header"><div><h1>Todos os Usuários</h1><p>Gerenciar usuários da plataforma</p></div><button class="btn btn-primary" onclick="openModal('modal-sa-user')">+ Novo Usuário</button></div>
+      <div class="search-wrap" style="margin-bottom:16px;"><input type="text" id="search-sa-users" placeholder="🔍  Buscar por nome, email, empresa..." oninput="renderSAUsers()"></div>
+      <div class="card" id="sa-users-list"></div>
+    </div>
+
+    <!-- SUPERADMIN: Ordens globais -->
+    <div class="page" id="page-sa-orders">
+      <div class="page-header"><div><h1>Todas as Ordens</h1><p>Visão global da plataforma</p></div>
+        <button class="btn btn-ghost" onclick="exportOrders()">⬇ Exportar CSV</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="field" style="margin:0;flex:1;min-width:180px;"><label>Empresa</label><select id="filter-company" onchange="loadSAOrders()"><option value="">Todas as empresas</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:180px;"><label>Transportadora</label><select id="filter-carrier" onchange="loadSAOrders()"><option value="">Todas</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:160px;"><label>Motorista</label><select id="filter-driver" onchange="loadSAOrders()"><option value="">Todos</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Status</label><select id="filter-status" onchange="loadSAOrders()"><option value="">Todos</option><option value="pendente">Pendente</option><option value="atribuido">Atribuído</option><option value="coletado">Coletado</option><option value="entregue">Entregue</option><option value="problema">Problema</option><option value="arquivado">Arquivado</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Data início</label><input type="date" id="filter-date-from" onchange="loadSAOrders()"></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Data fim</label><input type="date" id="filter-date-to" onchange="loadSAOrders()"></div>
+      </div>
+      <div id="sa-orders-stats" style="margin-bottom:16px;"></div>
+      <div id="sa-orders-list"></div>
+    </div>
+
     <!-- EMPRESA -->
     <div class="page" id="page-emp-dashboard">
       <div class="page-header"><div><h1>Dashboard</h1><p id="emp-company-name">—</p></div><button class="btn btn-primary" onclick="openNewOrderModal()">+ Nova Ordem</button></div>
@@ -301,6 +325,33 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-sa-company')">Cancelar</button>
       <button class="btn btn-primary" onclick="createCompany()">Criar Empresa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Usuário SA -->
+<div class="modal-overlay" id="modal-sa-user">
+  <div class="modal">
+    <div class="modal-header"><h2 id="sa-user-modal-title">Novo Usuário</h2><button class="modal-close" onclick="closeModal('modal-sa-user')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome</label><input type="text" id="sau-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="sau-email" placeholder="email@exemplo.com"></div>
+      <div class="field" id="sau-pass-wrap"><label>Senha</label><input type="password" id="sau-pass" placeholder="mínimo 6 caracteres"></div>
+      <div class="field"><label>Perfil</label>
+        <select id="sau-role" onchange="toggleSAUserContext()">
+          <option value="superadmin">Super Admin</option>
+          <option value="admin_empresa">Admin Empresa</option>
+          <option value="solicitante">Solicitante</option>
+          <option value="admin_transportadora">Admin Transportadora</option>
+          <option value="motorista">Motorista</option>
+        </select>
+      </div>
+      <div class="field" id="sau-company-wrap" style="display:none;"><label>Empresa</label><select id="sau-company"><option value="">Selecione...</option></select></div>
+      <div class="field" id="sau-carrier-wrap" style="display:none;"><label>Transportadora</label><select id="sau-carrier"><option value="">Selecione...</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-user')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createSAUser()">Criar</button>
     </div>
   </div>
 </div>
@@ -557,7 +608,12 @@ function buildNav() {
   const nav = document.getElementById('nav-tabs'); nav.innerHTML='';
   let tabs=[], firstPage='';
   if (CU.role==='superadmin') {
-    tabs=[{id:'page-sa-companies',label:'🏢 Empresas'},{id:'page-sa-carriers',label:'🚚 Transportadoras'}];
+    tabs=[
+      {id:'page-sa-companies',label:'🏢 Empresas'},
+      {id:'page-sa-carriers',label:'🚚 Transportadoras'},
+      {id:'page-sa-users',label:'👥 Usuários'},
+      {id:'page-sa-orders',label:'📦 Ordens'}
+    ];
     firstPage='page-sa-companies';
   } else if (CU.role==='admin_empresa'||CU.role==='solicitante') {
     tabs=[{id:'page-emp-dashboard',label:'Dashboard'},{id:'page-emp-carriers',label:'Transportadoras'}];
@@ -585,6 +641,8 @@ function showPage(id) {
   document.getElementById(id).classList.add('active');
   if(id==='page-sa-companies') loadSACompanies();
   if(id==='page-sa-carriers') loadSACarriers();
+  if(id==='page-sa-users') loadSAUsers();
+  if(id==='page-sa-orders') initSAOrders();
   if(id==='page-emp-dashboard') loadDashboard();
   if(id==='page-emp-carriers') loadEmpCarriers();
   if(id==='page-emp-users') loadEmpUsers();
@@ -672,6 +730,217 @@ async function loadSACarriers() {
       </div>
     </div>
   `).join('');
+}
+
+// ── SUPERADMIN: USERS ──
+let allSAUsers = [];
+
+async function loadSAUsers() {
+  const {data} = await sb.from('users').select('id,name,email,role,company_id,carrier_id,created_at,companies(name),carriers(name)').order('created_at',{ascending:false});
+  allSAUsers = data || [];
+  // Populate filter dropdowns
+  renderSAUsers();
+}
+
+function renderSAUsers() {
+  const q = (document.getElementById('search-sa-users')?.value||'').toLowerCase().trim();
+  let pool = allSAUsers;
+  if (q) pool = pool.filter(u=>
+    u.name.toLowerCase().includes(q)||
+    u.email.toLowerCase().includes(q)||
+    (u.companies?.name||'').toLowerCase().includes(q)||
+    (u.carriers?.name||'').toLowerCase().includes(q)
+  );
+  const list = document.getElementById('sa-users-list');
+  if (!pool.length) { list.innerHTML='<div class="empty"><div class="empty-icon">👥</div><h3>Nenhum usuário</h3></div>'; return; }
+  list.innerHTML = pool.map(u=>`
+    <div class="entity-row">
+      <div class="entity-info">
+        <div class="entity-name">${u.name}</div>
+        <div class="entity-meta">${u.email} · ${u.companies?.name||u.carriers?.name||'—'} · Criado em ${fmtDate(u.created_at)}</div>
+      </div>
+      <div class="entity-actions">
+        <span class="role-pill role-${u.role}">${roleLabel(u.role)}</span>
+        ${u.id!==CU.id?`
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${u.id}','${u.name.replace(/'/g,"\'")}')">🔑 Reset</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteSAUser('${u.id}','${u.name.replace(/'/g,"\'")}')">🗑</button>
+        `:'<span style="font-size:11px;color:var(--text-muted);">você</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleSAUserContext() {
+  const role = document.getElementById('sau-role').value;
+  const compWrap = document.getElementById('sau-company-wrap');
+  const carWrap = document.getElementById('sau-carrier-wrap');
+  compWrap.style.display = ['admin_empresa','solicitante'].includes(role) ? 'flex' : 'none';
+  carWrap.style.display = ['admin_transportadora','motorista'].includes(role) ? 'flex' : 'none';
+
+  if (['admin_empresa','solicitante'].includes(role)) {
+    const {data} = await sb.from('companies').select('id,name').eq('active',true).order('name');
+    const sel = document.getElementById('sau-company');
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    (data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }
+  if (['admin_transportadora','motorista'].includes(role)) {
+    const {data} = await sb.from('carriers').select('id,name').eq('active',true).order('name');
+    const sel = document.getElementById('sau-carrier');
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    (data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }
+}
+
+async function createSAUser() {
+  const name = document.getElementById('sau-name').value.trim();
+  const email = document.getElementById('sau-email').value.trim().toLowerCase();
+  const pass = document.getElementById('sau-pass').value;
+  const role = document.getElementById('sau-role').value;
+  const companyId = document.getElementById('sau-company')?.value||null;
+  const carrierId = document.getElementById('sau-carrier')?.value||null;
+  if (!name||!email||!pass) { toast('Preencha todos os campos','error'); return; }
+  if (pass.length<6) { toast('Senha mínima 6 caracteres','error'); return; }
+  if (['admin_empresa','solicitante'].includes(role) && !companyId) { toast('Selecione a empresa','error'); return; }
+  if (['admin_transportadora','motorista'].includes(role) && !carrierId) { toast('Selecione a transportadora','error'); return; }
+  const payload = {name,email,password_hash:hashPass(pass),role};
+  if (companyId) payload.company_id = companyId;
+  if (carrierId) payload.carrier_id = carrierId;
+  const {error} = await sb.from('users').insert(payload);
+  if (error) { toast(error.code==='23505'?'Email já cadastrado':'Erro: '+error.message,'error'); return; }
+  toast('Usuário criado!','success');
+  closeModal('modal-sa-user');
+  ['sau-name','sau-email','sau-pass'].forEach(id=>document.getElementById(id).value='');
+  loadSAUsers();
+}
+
+async function deleteSAUser(id, name) {
+  if (!confirm(`Remover usuário "${name}"?`)) return;
+  await sb.from('users').delete().eq('id',id);
+  toast('Usuário removido','info'); loadSAUsers();
+}
+
+// ── SUPERADMIN: ORDERS ──
+let allSAOrders = [];
+
+async function initSAOrders() {
+  // Populate company filter
+  const {data:companies} = await sb.from('companies').select('id,name').order('name');
+  const selC = document.getElementById('filter-company');
+  selC.innerHTML = '<option value="">Todas as empresas</option>';
+  (companies||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;selC.appendChild(o);});
+
+  // Populate carrier filter
+  const {data:carriers} = await sb.from('carriers').select('id,name').order('name');
+  const selCar = document.getElementById('filter-carrier');
+  selCar.innerHTML = '<option value="">Todas</option>';
+  (carriers||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;selCar.appendChild(o);});
+
+  // Populate driver filter
+  const {data:drivers} = await sb.from('users').select('id,name').eq('role','motorista').order('name');
+  const selD = document.getElementById('filter-driver');
+  selD.innerHTML = '<option value="">Todos</option>';
+  (drivers||[]).forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.name;selD.appendChild(o);});
+
+  await loadSAOrders();
+}
+
+async function loadSAOrders() {
+  let query = sb.from('orders').select('*,companies(name),carriers(name),users!orders_assigned_driver_id_fkey(name)').order('delivery_scheduled_date',{ascending:false});
+
+  const companyId = document.getElementById('filter-company')?.value;
+  const carrierId = document.getElementById('filter-carrier')?.value;
+  const driverId = document.getElementById('filter-driver')?.value;
+  const status = document.getElementById('filter-status')?.value;
+  const dateFrom = document.getElementById('filter-date-from')?.value;
+  const dateTo = document.getElementById('filter-date-to')?.value;
+
+  if (companyId) query = query.eq('company_id', companyId);
+  if (carrierId) query = query.eq('carrier_id', carrierId);
+  if (driverId) query = query.eq('assigned_driver_id', driverId);
+  if (status) query = query.eq('status', status);
+  if (dateFrom) query = query.gte('delivery_scheduled_date', dateFrom);
+  if (dateTo) query = query.lte('delivery_scheduled_date', dateTo);
+
+  const {data} = await query;
+  allSAOrders = data || [];
+  renderSAOrders();
+}
+
+function renderSAOrders() {
+  const list = document.getElementById('sa-orders-list');
+  const stats = document.getElementById('sa-orders-stats');
+  const total = allSAOrders.length;
+  const entregue = allSAOrders.filter(o=>o.status==='entregue').length;
+  const problema = allSAOrders.filter(o=>o.status==='problema').length;
+  const pendente = allSAOrders.filter(o=>['pendente','atribuido'].includes(o.status)).length;
+
+  stats.innerHTML = `<div class="stats-row" style="margin-bottom:0;">
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value orange">${pendente}</div></div>
+    <div class="stat-card"><div class="stat-label">Entregues</div><div class="stat-value green">${entregue}</div></div>
+    <div class="stat-card"><div class="stat-label">Problemas</div><div class="stat-value red">${problema}</div></div>
+  </div>`;
+
+  if (!allSAOrders.length) { list.innerHTML='<div class="empty"><div class="empty-icon">📦</div><h3>Nenhuma ordem</h3><p>Ajuste os filtros</p></div>'; return; }
+
+  list.innerHTML = allSAOrders.map(o=>`
+    <div class="card" onclick="viewOrder('${o.id}')" style="cursor:pointer;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">${o.companies?.name||'—'} → ${o.carriers?.name||'—'} ${o.users?'→ '+o.users.name:''} · ${fmtDateOnly(o.delivery_scheduled_date)}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Qtd</div><div class="info-value">${o.quantity}</div></div>
+        ${o.delivery_timestamp?`<div class="info-item"><div class="info-label">Entregue em</div><div class="info-value timestamp">${fmtDate(o.delivery_timestamp)}</div></div>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function exportOrders() {
+  if (!allSAOrders.length) { toast('Nenhuma ordem para exportar','error'); return; }
+  const headers = ['ID','Data','Item','Quantidade','Status','Empresa','Transportadora','Motorista','End. Coleta','Horário Coleta','Resp. Coleta','Coletado por','Timestamp Coleta','Item Conforme','Qtd Conforme','Obs. Coleta','End. Entrega','Horário Entrega','Resp. Entrega','Recebido por','Timestamp Entrega','Obs. Entrega'];
+  const rows = allSAOrders.map(o=>[
+    o.id,
+    o.delivery_scheduled_date,
+    `"${o.item_description}"`,
+    o.quantity,
+    o.status,
+    `"${o.companies?.name||''}"`,
+    `"${o.carriers?.name||''}"`,
+    `"${o.users?.name||''}"`,
+    `"${o.pickup_address}"`,
+    o.pickup_time,
+    `"${o.pickup_responsible}"`,
+    `"${o.collector_name||''}"`,
+    o.pickup_timestamp ? fmtDate(o.pickup_timestamp) : '',
+    o.item_confirmed===true?'Sim':o.item_confirmed===false?'Não':'',
+    o.quantity_confirmed===true?'Sim':o.quantity_confirmed===false?'Não':'',
+    `"${(o.pickup_notes||'').replace(/"/g,"'")}"`,
+    `"${o.delivery_address}"`,
+    o.delivery_scheduled_time,
+    `"${o.delivery_responsible}"`,
+    `"${o.receiver_name||''}"`,
+    o.delivery_timestamp ? fmtDate(o.delivery_timestamp) : '',
+    `"${(o.delivery_notes||'').replace(/"/g,"'")}"`
+  ].join(','));
+
+  const csv = [headers.join(','), ...rows].join('
+');
+  const bom = '﻿'; // UTF-8 BOM para Excel
+  const blob = new Blob([bom+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url;
+  const now = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+  a.download = `km-entregas-${now}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast(`${allSAOrders.length} ordens exportadas!`,'success');
 }
 
 // ── EMPRESA: CARRIERS ──
