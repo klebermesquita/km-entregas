@@ -221,6 +221,7 @@
   .status-coletado { background: var(--blue-dim); color: var(--blue); }
   .status-entregue { background: var(--green-dim); color: var(--green); }
   .status-problema { background: var(--red-dim); color: var(--red); }
+  .status-arquivado { background: var(--border); color: var(--text-muted); }
 
   /* ── INFO GRID ── */
   .info-grid {
@@ -375,6 +376,24 @@
   .stat-value.blue { color: var(--blue); }
   .stat-value.red { color: var(--red); }
 
+  .search-bar-wrap {
+    margin-bottom: 16px;
+  }
+  .search-bar-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 10px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-bar-wrap input:focus { border-color: var(--accent); }
+  .search-bar-wrap input::placeholder { color: var(--text-muted); }
+
   @media (max-width: 600px) {
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .topbar { padding: 0 16px; }
@@ -479,6 +498,10 @@
         <button class="filter-btn" data-filter="coletado" onclick="setFilter('coletado',this)">Coletadas</button>
         <button class="filter-btn" data-filter="entregue" onclick="setFilter('entregue',this)">Entregues</button>
         <button class="filter-btn" data-filter="problema" onclick="setFilter('problema',this)">Problemas</button>
+        <button class="filter-btn" data-filter="arquivado" onclick="setFilter('arquivado',this)">🗄 Arquivadas</button>
+      </div>
+      <div class="search-bar-wrap">
+        <input type="text" id="search-orders" placeholder="🔍  Buscar por item, endereço, responsável..." oninput="renderOrders()" autocomplete="off">
       </div>
       <div id="orders-list"></div>
     </div>
@@ -641,6 +664,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
 let allOrders = [];
+let allOrdersArchived = [];
 let allOrdersT = [];
 let currentFilter = 'all';
 let currentFilterT = 'all';
@@ -677,7 +701,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 
 function statusLabel(s) {
-  const map = {pendente:'Pendente', coletado:'Coletado', entregue:'Entregue', problema:'Problema'};
+  const map = {pendente:'Pendente', coletado:'Coletado', entregue:'Entregue', problema:'Problema', arquivado:'Arquivado'};
   return `<span class="status status-${s}">${map[s]||s}</span>`;
 }
 
@@ -767,9 +791,25 @@ function showPage(id) {
 }
 
 // ── DASHBOARD ──
+async function archiveOrder(id, name) {
+  if (!confirm(`Arquivar a ordem "${name}"?\nEla ficará no histórico mas não aparecerá no dashboard ativo.`)) return;
+  const { error } = await sb.from('orders').update({ status: 'arquivado' }).eq('id', id);
+  if (error) { toast('Erro ao arquivar: '+error.message,'error'); return; }
+  toast('Ordem arquivada','info');
+  loadDashboard();
+}
+
+async function unarchiveOrder(id) {
+  const { error } = await sb.from('orders').update({ status: 'entregue' }).eq('id', id);
+  if (error) { toast('Erro ao restaurar: '+error.message,'error'); return; }
+  toast('Ordem restaurada','success');
+  loadDashboard();
+}
+
 async function loadDashboard() {
   const { data } = await sb.from('orders').select('*').order('delivery_scheduled_date', {ascending:false});
-  allOrders = data || [];
+  allOrders = (data || []).filter(o => o.status !== 'arquivado');
+  allOrdersArchived = (data || []).filter(o => o.status === 'arquivado');
   renderStats();
   renderOrders();
 }
@@ -782,7 +822,7 @@ function renderStats() {
   const problema = allOrders.filter(o=>o.status==='problema').length;
 
   document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Ativas</div><div class="stat-value">${total}</div></div>
     <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value orange">${pendente}</div></div>
     <div class="stat-card"><div class="stat-label">Entregues</div><div class="stat-value green">${entregue}</div></div>
     <div class="stat-card"><div class="stat-label">Problemas</div><div class="stat-value red">${problema}</div></div>
@@ -797,19 +837,40 @@ function setFilter(f, el) {
 
 function renderOrders() {
   const list = document.getElementById('orders-list');
-  let orders = currentFilter === 'all' ? allOrders : allOrders.filter(o=>o.status===currentFilter);
-  if (!orders.length) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">📦</div><h3>Nenhuma ordem</h3><p>Crie uma nova ordem para começar</p></div>`;
+  const searchEl = document.getElementById('search-orders');
+  const q = searchEl ? searchEl.value.toLowerCase().trim() : '';
+
+  let pool = currentFilter === 'arquivado' ? allOrdersArchived
+           : currentFilter === 'all' ? allOrders
+           : allOrders.filter(o=>o.status===currentFilter);
+
+  if (q) {
+    pool = pool.filter(o =>
+      o.item_description.toLowerCase().includes(q) ||
+      o.pickup_address.toLowerCase().includes(q) ||
+      o.delivery_address.toLowerCase().includes(q) ||
+      o.pickup_responsible.toLowerCase().includes(q) ||
+      o.delivery_responsible.toLowerCase().includes(q)
+    );
+  }
+
+  if (!pool.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">${currentFilter==='arquivado'?'🗄':'📦'}</div><h3>${q ? 'Nenhum resultado' : currentFilter==='arquivado' ? 'Nenhuma ordem arquivada' : 'Nenhuma ordem'}</h3><p>${q ? 'Tente outros termos de busca' : 'Crie uma nova ordem para começar'}</p></div>`;
     return;
   }
-  list.innerHTML = orders.map(o => `
-    <div class="card" style="cursor:pointer" onclick="viewOrder('${o.id}')">
+
+  const isArchived = currentFilter === 'arquivado';
+  list.innerHTML = pool.map(o => `
+    <div class="card" style="cursor:pointer;${isArchived?'opacity:0.7;':''}" onclick="viewOrder('${o.id}')">
       <div class="card-header">
         <div>
           <div class="card-title">${o.item_description}</div>
           <div class="card-sub">Entrega: ${fmtDateOnly(o.delivery_scheduled_date)} às ${o.delivery_scheduled_time} · Qtd: ${o.quantity}</div>
         </div>
-        ${statusLabel(o.status)}
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${statusLabel(o.status)}
+          ${!isArchived ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();archiveOrder('${o.id}','${o.item_description.replace(/'/g,"\'")}')">🗄 Arquivar</button>` : `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();unarchiveOrder('${o.id}')">↩ Restaurar</button>`}
+        </div>
       </div>
       <div class="info-grid">
         <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
