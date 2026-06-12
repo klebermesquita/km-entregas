@@ -203,6 +203,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="user-name" id="topbar-name">—</div>
       </div>
       <span class="role-pill" id="topbar-role">—</span>
+      <button class="btn btn-ghost" onclick="openMyAccount()" style="padding:6px 12px;">🔑 Senha</button>
       <button class="btn btn-ghost" onclick="doLogout()" style="padding:6px 12px;">Sair</button>
     </div>
   </div>
@@ -432,6 +433,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+
+<!-- MODAL: Trocar/Resetar Senha -->
+<div class="modal-overlay" id="modal-password">
+  <div class="modal">
+    <div class="modal-header"><h2 id="pass-modal-title">Trocar Senha</h2><button class="modal-close" onclick="closeModal('modal-password')">×</button></div>
+    <div class="modal-body">
+      <div id="pass-current-wrap" class="field">
+        <label>Senha Atual</label>
+        <input type="password" id="pass-current" placeholder="Sua senha atual">
+      </div>
+      <div class="field"><label>Nova Senha</label><input type="password" id="pass-new" placeholder="mínimo 6 caracteres"></div>
+      <div class="field"><label>Confirmar Nova Senha</label><input type="password" id="pass-confirm" placeholder="repita a nova senha"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-password')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitChangePassword()">Salvar</button>
+    </div>
+  </div>
+</div>
 <script>
 const SUPABASE_URL = 'https://ccwamzabidwvjtblcxxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Zd4exOz1Qo9zDfGyJgpa1Q_GE7aPJfQ';
@@ -929,7 +949,7 @@ async function loadEmpUsers() {
       </div>
       <div class="entity-actions">
         <span class="role-pill role-${u.role}">${roleLabel(u.role)}</span>
-        ${u.id!==CU.id?`<button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','emp')">Remover</button>`:'<span style="font-size:11px;color:var(--text-muted);">você</span>'}
+        ${u.id!==CU.id?`<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${u.id}','${u.name.replace(/'/g,"\\'")}')">🔑 Reset</button><button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','emp')">Remover</button>`:'<span style="font-size:11px;color:var(--text-muted);">você</span>'}
       </div>
     </div>
   `).join('');
@@ -1042,6 +1062,7 @@ async function loadCarDrivers() {
       </div>
       <div class="entity-actions">
         <span class="role-pill role-motorista">Motorista</span>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${d.id}','${d.name.replace(/'/g,"\\'")}')">🔑 Reset</button>
         <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${d.id}','${d.name.replace(/'/g,"\\'")}','car')">Remover</button>
       </div>
     </div>
@@ -1164,18 +1185,18 @@ function openCollectModal(orderId) {
     <div style="margin-bottom:16px;">
       <div class="info-label" style="margin-bottom:10px;">Item coletado é o que foi solicitado?</div>
       <div class="check-group">
-        <label class="check-option"><input type="radio" name="item-conf" value="yes"><span>✅ Sim, conforme</span></label>
-        <label class="check-option"><input type="radio" name="item-conf" value="no"><span>⚠️ Não conforme</span></label>
+        <label class="check-option"><input type="radio" name="item-conf" value="yes" onchange="checkProblemNotes()"><span>✅ Sim, conforme</span></label>
+        <label class="check-option"><input type="radio" name="item-conf" value="no" onchange="checkProblemNotes()"><span>⚠️ Não conforme</span></label>
       </div>
     </div>
     <div style="margin-bottom:16px;">
       <div class="info-label" style="margin-bottom:10px;">Quantidade bate com o solicitado? (${o.quantity} unid.)</div>
       <div class="check-group">
-        <label class="check-option"><input type="radio" name="qty-conf" value="yes"><span>✅ Sim, correta</span></label>
-        <label class="check-option"><input type="radio" name="qty-conf" value="no"><span>⚠️ Divergente</span></label>
+        <label class="check-option"><input type="radio" name="qty-conf" value="yes" onchange="checkProblemNotes()"><span>✅ Sim, correta</span></label>
+        <label class="check-option"><input type="radio" name="qty-conf" value="no" onchange="checkProblemNotes()"><span>⚠️ Divergente</span></label>
       </div>
     </div>
-    <div class="field"><label>Observações (opcional)</label><textarea id="d-pickup-notes" placeholder="Ex: Faltaram 2 unidades porque..."></textarea></div>
+    <div class="field"><label>Observações <span id="notes-required-label" style="color:var(--red);display:none;">*obrigatório</span></label><textarea id="d-pickup-notes" placeholder="Ex: Faltaram 2 unidades porque..."></textarea></div>
     <div class="divider"></div>
     <div class="section-label">Rubrica de Coleta</div>
     <div class="sig-wrapper" style="position:relative;"><canvas id="sig-collect" style="width:100%;height:140px;"></canvas><div class="sig-placeholder" id="sig-collect-ph">Assine aqui</div></div>
@@ -1197,14 +1218,21 @@ function openDeliveryModal(orderId) {
   document.getElementById('detail-title').textContent='Registrar Entrega — '+o.item_description;
   document.getElementById('detail-body').innerHTML=`
     <div class="field"><label>Nome de quem recebeu</label><input type="text" id="d-receiver" placeholder="Nome do recebedor"></div>
-    <div class="field"><label>Observações (opcional)</label><textarea id="d-delivery-notes" placeholder="Observações..."></textarea></div>
+    <div class="field"><label>Observações <span id="delivery-notes-req" style="color:var(--red);font-size:11px;"></span></label><textarea id="d-delivery-notes" placeholder="Se houver qualquer problema na entrega, descreva aqui..."></textarea></div>
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Houve algum problema na entrega?</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="delivery-prob" value="no" onchange="checkDeliveryProblem()"><span>✅ Entrega normal</span></label>
+        <label class="check-option"><input type="radio" name="delivery-prob" value="yes" onchange="checkDeliveryProblem()"><span>⚠️ Houve problema</span></label>
+      </div>
+    </div>
     <div class="divider"></div>
     <div class="section-label">Rubrica de Entrega</div>
     <div class="sig-wrapper" style="position:relative;"><canvas id="sig-delivery" style="width:100%;height:140px;"></canvas><div class="sig-placeholder" id="sig-delivery-ph">Assine aqui</div></div>
     <div class="sig-actions"><button class="btn btn-ghost" onclick="clearSig('sig-delivery')">Limpar</button></div>
     <div class="divider"></div>
     <div class="section-label">Foto da Entrega</div>
-    <div class="photo-area" onclick="document.getElementById('photo-input').click()"><div style="font-size:32px;">📷</div><p>Toque para tirar foto ou escolher da galeria</p></div>
+    <div class="photo-area" onclick="document.getElementById('photo-input').click()" id="photo-area-box"><div style="font-size:32px;">📷</div><p>Toque para tirar foto ou escolher da galeria <strong style="color:var(--red);">*obrigatória</strong></p></div>
     <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)">
     <img id="photo-preview" class="photo-preview" style="display:none;margin-top:12px;">
   `;
@@ -1233,6 +1261,7 @@ async function submitCollect() {
   if(!qtyConf){toast('Confirme a quantidade','error');return;}
   const sigData=getSigData('sig-collect');
   const hasProb=itemConf.value==='no'||qtyConf.value==='no';
+  if(hasProb && !notes){toast('⚠️ Observações obrigatórias quando há divergência','error');document.getElementById('d-pickup-notes').focus();return;}
   const {error}=await sb.from('orders').update({
     status:hasProb?'problema':'coletado',
     collector_name:collector,
@@ -1252,9 +1281,14 @@ async function submitDelivery() {
   const receiver=document.getElementById('d-receiver').value.trim();
   const notes=document.getElementById('d-delivery-notes').value.trim();
   const sigData=getSigData('sig-delivery');
+  const deliveryProbRad=document.querySelector('input[name="delivery-prob"]:checked');
   if(!receiver){toast('Informe o nome do recebedor','error');return;}
-  let photoUrl=null;
+  if(!deliveryProbRad){toast('Indique se houve problema na entrega','error');return;}
+  const hasDeliveryProb=deliveryProbRad.value==='yes';
+  if(hasDeliveryProb && !notes){toast('⚠️ Descreva o problema na entrega nas observações','error');document.getElementById('d-delivery-notes').focus();return;}
   const photoInput=document.getElementById('photo-input');
+  if(!photoInput.files[0]){toast('📷 Foto da entrega é obrigatória','error');document.getElementById('photo-area-box').style.borderColor='var(--red)';return;}
+  let photoUrl=null;
   if(photoInput.files[0]){
     const file=photoInput.files[0];
     const fileName=`${activeOrderId}_${Date.now()}.jpg`;
@@ -1264,7 +1298,7 @@ async function submitDelivery() {
     photoUrl=urlData.publicUrl;
   }
   const {error}=await sb.from('orders').update({
-    status:'entregue',receiver_name:receiver,
+    status:hasDeliveryProb?'problema':'entregue',receiver_name:receiver,
     delivery_notes:notes||null,delivery_signature:sigData||null,
     delivery_photo_url:photoUrl,delivery_timestamp:new Date().toISOString()
   }).eq('id',activeOrderId);
@@ -1361,6 +1395,73 @@ ${photoSection}
   a.href=url; a.download=`recibo_${o.item_description.replace(/[^a-z0-9]/gi,'_').toLowerCase()}.html`;
   a.click(); URL.revokeObjectURL(url);
   toast('Abra o arquivo e use Ctrl+P para salvar como PDF.','info');
+}
+
+// ── SENHA ──
+let _resetTargetId = null;
+
+function openMyAccount() {
+  document.getElementById('pass-modal-title').textContent = 'Trocar Minha Senha';
+  document.getElementById('pass-current-wrap').style.display = 'flex';
+  _resetTargetId = null;
+  document.getElementById('pass-current').value='';
+  document.getElementById('pass-new').value='';
+  document.getElementById('pass-confirm').value='';
+  openModal('modal-password');
+}
+
+function openResetPassword(userId, userName) {
+  document.getElementById('pass-modal-title').textContent = `Resetar Senha — ${userName}`;
+  document.getElementById('pass-current-wrap').style.display = 'none';
+  _resetTargetId = userId;
+  document.getElementById('pass-new').value='';
+  document.getElementById('pass-confirm').value='';
+  openModal('modal-password');
+}
+
+async function submitChangePassword() {
+  const newPass = document.getElementById('pass-new').value;
+  const confirmPass = document.getElementById('pass-confirm').value;
+  if(!newPass){toast('Informe a nova senha','error');return;}
+  if(newPass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  if(newPass!==confirmPass){toast('As senhas não conferem','error');return;}
+
+  if(_resetTargetId) {
+    // Admin resetting another user
+    const {error}=await sb.from('users').update({password_hash:hashPass(newPass)}).eq('id',_resetTargetId);
+    if(error){toast('Erro: '+error.message,'error');return;}
+    toast('Senha resetada com sucesso!','success');
+  } else {
+    // User changing own password
+    const currentPass = document.getElementById('pass-current').value;
+    if(!currentPass){toast('Informe a senha atual','error');return;}
+    if(hashPass(currentPass)!==CU.password_hash){toast('Senha atual incorreta','error');return;}
+    const {error}=await sb.from('users').update({password_hash:hashPass(newPass)}).eq('id',CU.id);
+    if(error){toast('Erro: '+error.message,'error');return;}
+    CU.password_hash=hashPass(newPass);
+    sessionStorage.setItem('km_user',JSON.stringify(CU));
+    toast('Senha alterada com sucesso!','success');
+  }
+  closeModal('modal-password');
+}
+
+function checkProblemNotes() {
+  const itemConf=document.querySelector('input[name="item-conf"]:checked');
+  const qtyConf=document.querySelector('input[name="qty-conf"]:checked');
+  const hasProb=(itemConf&&itemConf.value==='no')||(qtyConf&&qtyConf.value==='no');
+  const label=document.getElementById('notes-required-label');
+  if(label) label.style.display=hasProb?'inline':'none';
+  const ta=document.getElementById('d-pickup-notes');
+  if(ta) ta.placeholder=hasProb?'⚠️ Obrigatório: descreva a divergência encontrada...':'Ex: Faltaram 2 unidades porque...';
+}
+
+function checkDeliveryProblem() {
+  const rad=document.querySelector('input[name="delivery-prob"]:checked');
+  const hasProb=rad&&rad.value==='yes';
+  const label=document.getElementById('delivery-notes-req');
+  if(label) label.textContent=hasProb?'*obrigatório':'(opcional)';
+  const ta=document.getElementById('d-delivery-notes');
+  if(ta) ta.placeholder=hasProb?'⚠️ Obrigatório: descreva o problema na entrega...':'Observações adicionais...';
 }
 
 // ── INIT ──
