@@ -960,6 +960,7 @@ function renderTransportOrders() {
       <div class="actions-row">
         ${o.status === 'pendente' ? `<button class="btn btn-primary" onclick="openCollectModal('${o.id}')">Registrar Coleta</button>` : ''}
         ${o.status === 'coletado' ? `<button class="btn btn-success" onclick="openDeliveryModal('${o.id}')">Registrar Entrega</button>` : ''}
+        ${o.status === 'problema' ? `<button class="btn btn-success" onclick="openDeliveryModal('${o.id}')">Registrar Entrega</button><span style="color:var(--red);font-size:12px;margin-left:8px;">⚠️ Coleta com divergência</span>` : ''}
         ${o.status === 'entregue' ? `<span style="color:var(--green);font-size:13px;">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</span>` : ''}
       </div>
     </div>
@@ -1102,8 +1103,8 @@ async function submitCollect() {
     pickup_timestamp: new Date().toISOString()
   }).eq('id', activeOrderId);
 
-  if (error) { toast('Erro: '+error.message,'error'); return; }
-  toast(hasProb ? 'Coleta registrada com problema!' : 'Coleta confirmada!', hasProb ? 'error' : 'success');
+  if (error) { toast('Erro ao salvar: '+error.message,'error'); return; }
+  toast(hasProb ? '⚠️ Coleta registrada com divergência' : '✓ Coleta confirmada!', hasProb ? 'info' : 'success');
   closeModal('modal-detail');
   loadTransportOrders();
 }
