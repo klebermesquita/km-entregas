@@ -216,7 +216,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="sa-companies-list"></div>
     </div>
     <div class="page" id="page-sa-carriers">
-      <div class="page-header"><div><h1>Transportadoras</h1><p>Todas na plataforma</p></div></div>
+      <div class="page-header"><div><h1>Transportadoras</h1><p>Todas na plataforma</p></div><button class="btn btn-primary" onclick="openSACreateCarrier()">+ Nova Transportadora</button></div>
       <div id="sa-carriers-list"></div>
     </div>
 
@@ -325,6 +325,47 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-sa-company')">Cancelar</button>
       <button class="btn btn-primary" onclick="createCompany()">Criar Empresa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nova Transportadora SA -->
+<div class="modal-overlay" id="modal-sa-carrier">
+  <div class="modal">
+    <div class="modal-header"><h2>Nova Transportadora</h2><button class="modal-close" onclick="closeModal('modal-sa-carrier')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field span2"><label>Nome da Transportadora</label><input type="text" id="sac-name" placeholder="Nome ou razão social"></div>
+        <div class="field"><label>CPF ou CNPJ</label><input type="text" id="sac-doc" placeholder="000.000.000-00"></div>
+        <div class="field"><label>Nome do Responsável</label><input type="text" id="sac-contact" placeholder="Nome completo"></div>
+        <div class="field"><label>WhatsApp</label><input type="text" id="sac-whatsapp" placeholder="(11) 99999-9999"></div>
+        <div class="field span2"><label>Email (login do admin)</label><input type="email" id="sac-email" placeholder="admin@transportadora.com"></div>
+        <div class="field"><label>Senha do Admin</label><input type="password" id="sac-pass" placeholder="mínimo 6 caracteres"></div>
+        <div class="field"><label>Nome do Admin</label><input type="text" id="sac-admin-name" placeholder="Nome do administrador"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-carrier')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createSACarrier()">Criar Transportadora</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Motoristas da Transportadora (SA) -->
+<div class="modal-overlay" id="modal-sa-drivers">
+  <div class="modal">
+    <div class="modal-header"><h2 id="sa-drivers-title">Motoristas</h2><button class="modal-close" onclick="closeModal('modal-sa-drivers')">×</button></div>
+    <div class="modal-body">
+      <div id="sa-drivers-list" style="margin-bottom:16px;"></div>
+      <div class="divider"></div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Adicionar Motorista</div>
+      <div class="field"><label>Nome</label><input type="text" id="sad-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="sad-email" placeholder="motorista@transportadora.com"></div>
+      <div class="field"><label>Senha</label><input type="password" id="sad-pass" placeholder="mínimo 6 caracteres"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-drivers')">Fechar</button>
+      <button class="btn btn-primary" onclick="createSADriver()">Adicionar Motorista</button>
     </div>
   </div>
 </div>
@@ -714,7 +755,7 @@ async function deleteCompany(id,name) {
 async function loadSACarriers() {
   const {data}=await sb.from('carriers').select('*').order('created_at',{ascending:false});
   const list=document.getElementById('sa-carriers-list');
-  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><h3>Nenhuma transportadora</h3><p>Cadastradas pelas empresas</p></div>';return;}
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><h3>Nenhuma transportadora</h3><p>Crie a primeira ou aguarde empresas cadastrarem</p></div>';return;}
   list.innerHTML=data.map(c=>`
     <div class="entity-card">
       <div class="entity-row">
@@ -726,10 +767,92 @@ async function loadSACarriers() {
         <div class="entity-actions">
           <span class="status status-${c.active?'ativo':'inativo'}">${c.active?'Ativa':'Inativa'}</span>
           <label class="toggle-switch"><input type="checkbox" ${c.active?'checked':''} onchange="toggleEntity('carriers','${c.id}',this.checked)"><span class="toggle-slider"></span></label>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openSADrivers('${c.id}','${c.name.replace(/'/g,"\'")}')">👥 Motoristas</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteSACarrier('${c.id}','${c.name.replace(/'/g,"\'")}')">🗑</button>
         </div>
       </div>
     </div>
   `).join('');
+}
+
+function openSACreateCarrier() {
+  ['sac-name','sac-doc','sac-contact','sac-whatsapp','sac-email','sac-pass','sac-admin-name'].forEach(id=>document.getElementById(id).value='');
+  openModal('modal-sa-carrier');
+}
+
+async function createSACarrier() {
+  const name=document.getElementById('sac-name').value.trim();
+  const doc=document.getElementById('sac-doc').value.trim();
+  const contact=document.getElementById('sac-contact').value.trim();
+  const whatsapp=document.getElementById('sac-whatsapp').value.trim();
+  const email=document.getElementById('sac-email').value.trim().toLowerCase();
+  const pass=document.getElementById('sac-pass').value;
+  const adminName=document.getElementById('sac-admin-name').value.trim();
+  if(!name||!doc||!contact||!whatsapp||!email||!pass||!adminName){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  const {data:carrier,error:cErr}=await sb.from('carriers').insert({name,document:doc,contact_name:contact,contact_whatsapp:whatsapp,contact_email:email}).select().single();
+  if(cErr){toast('Erro: '+cErr.message,'error');return;}
+  const {error:uErr}=await sb.from('users').insert({email,password_hash:hashPass(pass),name:adminName,role:'admin_transportadora',carrier_id:carrier.id});
+  if(uErr){await sb.from('carriers').delete().eq('id',carrier.id);toast('Erro ao criar admin: '+uErr.message,'error');return;}
+  toast(`Transportadora "${name}" criada!`,'success');
+  closeModal('modal-sa-carrier');
+  loadSACarriers();
+}
+
+async function deleteSACarrier(id, name) {
+  if(!confirm(`⚠️ Excluir transportadora "${name}"?
+
+Todos os motoristas serão removidos. Irreversível.`)) return;
+  await sb.from('users').delete().eq('carrier_id',id);
+  await sb.from('company_carriers').delete().eq('carrier_id',id);
+  await sb.from('carriers').delete().eq('id',id);
+  toast('Transportadora excluída','info'); loadSACarriers();
+}
+
+let _saDriversCarrierId = null;
+async function openSADrivers(carrierId, carrierName) {
+  _saDriversCarrierId = carrierId;
+  document.getElementById('sa-drivers-title').textContent = `Motoristas — ${carrierName}`;
+  ['sad-name','sad-email','sad-pass'].forEach(id=>document.getElementById(id).value='');
+  await loadSADriversList();
+  openModal('modal-sa-drivers');
+}
+
+async function loadSADriversList() {
+  const {data}=await sb.from('users').select('id,name,email').eq('carrier_id',_saDriversCarrierId).eq('role','motorista').order('name');
+  const list=document.getElementById('sa-drivers-list');
+  if(!data||!data.length){list.innerHTML='<div style="color:var(--text-muted);font-size:13px;">Nenhum motorista cadastrado.</div>';return;}
+  list.innerHTML=data.map(d=>`
+    <div class="entity-row" style="padding:8px 0;">
+      <div class="entity-info">
+        <div class="entity-name" style="font-size:13px;">${d.name}</div>
+        <div class="entity-meta">${d.email}</div>
+      </div>
+      <div class="entity-actions">
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;" onclick="openResetPassword('${d.id}','${d.name.replace(/'/g,"\'")}')">🔑 Reset</button>
+        <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="deleteSADriverFromModal('${d.id}','${d.name.replace(/'/g,"\'")}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createSADriver() {
+  const name=document.getElementById('sad-name').value.trim();
+  const email=document.getElementById('sad-email').value.trim().toLowerCase();
+  const pass=document.getElementById('sad-pass').value;
+  if(!name||!email||!pass){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  const {error}=await sb.from('users').insert({name,email,password_hash:hashPass(pass),role:'motorista',carrier_id:_saDriversCarrierId});
+  if(error){toast(error.code==='23505'?'Email já cadastrado':'Erro: '+error.message,'error');return;}
+  toast('Motorista adicionado!','success');
+  ['sad-name','sad-email','sad-pass'].forEach(id=>document.getElementById(id).value='');
+  loadSADriversList();
+}
+
+async function deleteSADriverFromModal(id, name) {
+  if(!confirm(`Remover motorista "${name}"?`)) return;
+  await sb.from('users').delete().eq('id',id);
+  toast('Removido','info'); loadSADriversList();
 }
 
 // ── SUPERADMIN: USERS ──
