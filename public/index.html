@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KM Entregas</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0f0f10;--surface:#18181b;--surface2:#1f1f23;--border:#2a2a30;--border2:#3a3a42;
+  --accent:#f97316;--accent-dim:rgba(249,115,22,.12);--accent-hover:#ea6b0c;
+  --text:#f4f4f5;--text-muted:#71717a;--text-dim:#a1a1aa;
+  --green:#22c55e;--green-dim:rgba(34,197,94,.12);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.12);
+  --yellow:#eab308;--yellow-dim:rgba(234,179,8,.12);
+  --blue:#3b82f6;--blue-dim:rgba(59,130,246,.12);
+  --purple:#a855f7;--purple-dim:rgba(168,85,247,.12);
+  --pink:#ec4899;--pink-dim:rgba(236,72,153,.12);
+  --radius:10px;--radius-sm:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+#toast{position:fixed;top:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;max-width:340px;line-height:1.4;}
+#toast.show{opacity:1;}#toast.success{background:var(--green);color:#000;}#toast.error{background:var(--red);color:#fff;}#toast.info{background:var(--accent);color:#fff;}
+
+/* LOGIN */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:400px;}
+.login-logo{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+.login-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+.login-sub{color:var(--text-muted);font-size:13px;margin-bottom:32px;}
+
+/* FORMS */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.field label{font-size:12px;font-weight:500;color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase;}
+.field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:10px 12px;font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .15s;width:100%;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+.field textarea{resize:vertical;min-height:80px;}
+.field select option{background:var(--surface2);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
+.form-grid .span2{grid-column:span 2;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:var(--radius-sm);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent-hover);}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border);}.btn-ghost:hover{border-color:var(--border2);color:var(--text);}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid transparent;}.btn-danger:hover{border-color:var(--red);}
+.btn-success{background:var(--green-dim);color:var(--green);border:1px solid transparent;}.btn-success:hover{border-color:var(--green);}
+.btn-full{width:100%;}.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* APP */
+#app{display:none;min-height:100vh;flex-direction:column;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.topbar-brand{display:flex;align-items:center;gap:12px;}
+.topbar-logo{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;}
+.topbar-sep{width:1px;height:20px;background:var(--border);}
+.topbar-ctx{font-size:13px;font-weight:500;color:var(--text-dim);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.user-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 4px;}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);}
+.user-name{font-size:12px;font-weight:500;}
+.role-pill{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;}
+.role-superadmin{background:var(--pink-dim);color:var(--pink);}
+.role-admin_empresa{background:var(--purple-dim);color:var(--purple);}
+.role-solicitante{background:var(--blue-dim);color:var(--blue);}
+.role-admin_transportadora{background:var(--yellow-dim);color:var(--yellow);}
+.role-motorista{background:var(--green-dim);color:var(--green);}
+
+.nav-tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;overflow-x:auto;}
+.nav-tab{padding:14px 18px;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.nav-tab:hover{color:var(--text);}.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+.content{padding:24px;max-width:1100px;margin:0 auto;width:100%;}
+.page{display:none;}.page.active{display:block;}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.page-header h1{font-size:20px;font-weight:700;}
+.page-header p{font-size:13px;color:var(--text-muted);margin-top:2px;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.card-title{font-size:15px;font-weight:600;}
+.card-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+
+.status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
+.status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+.status-pendente{background:var(--yellow-dim);color:var(--yellow);}
+.status-atribuido{background:var(--purple-dim);color:var(--purple);}
+.status-coletado{background:var(--blue-dim);color:var(--blue);}
+.status-entregue{background:var(--green-dim);color:var(--green);}
+.status-problema{background:var(--red-dim);color:var(--red);}
+.status-arquivado{background:var(--border);color:var(--text-muted);}
+.status-ativo{background:var(--green-dim);color:var(--green);}
+.status-inativo{background:var(--red-dim);color:var(--red);}
+
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:12px;}
+.info-item{display:flex;flex-direction:column;gap:3px;}
+.info-label{font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;}
+.info-value{font-size:13px;font-weight:500;}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.check-group{display:flex;gap:16px;flex-wrap:wrap;}
+.check-option{display:flex;align-items:center;gap:8px;cursor:pointer;}
+.check-option input[type=radio]{accent-color:var(--accent);width:16px;height:16px;}
+.check-option label{font-size:13px;cursor:pointer;}
+
+.sig-wrapper{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;position:relative;}
+.sig-wrapper canvas{display:block;cursor:crosshair;touch-action:none;}
+.sig-placeholder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-muted);font-size:12px;pointer-events:none;}
+.sig-actions{display:flex;gap:8px;margin-top:8px;}
+
+.photo-area{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;text-align:center;cursor:pointer;transition:border-color .15s;}
+.photo-area:hover{border-color:var(--accent);}
+.photo-area p{color:var(--text-muted);font-size:13px;margin-top:8px;}
+.photo-preview{max-width:100%;max-height:200px;border-radius:var(--radius-sm);margin-top:12px;}
+
+.modal-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:660px;margin:auto;}
+.modal-header{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;}
+.modal-header h2{font-size:17px;font-weight:700;}
+.modal-close{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:20px 24px;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+
+.empty{text-align:center;padding:48px 24px;color:var(--text-muted);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty h3{font-size:15px;font-weight:600;color:var(--text-dim);margin-bottom:6px;}
+.timestamp{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.filter-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);transition:all .15s;}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.search-wrap{margin-bottom:16px;}
+.search-wrap input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:10px 14px;font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .15s;}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-wrap input::placeholder{color:var(--text-muted);}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.stat-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.stat-value{font-size:24px;font-weight:700;}
+.stat-value.orange{color:var(--accent);}.stat-value.green{color:var(--green);}.stat-value.red{color:var(--red);}.stat-value.blue{color:var(--blue);}
+
+.actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+.entity-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:12px;}
+.entity-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.entity-row:last-child{border-bottom:none;}
+.entity-info{display:flex;flex-direction:column;gap:3px;}
+.entity-name{font-size:14px;font-weight:600;}
+.entity-meta{font-size:12px;color:var(--text-muted);}
+.entity-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+.toggle-switch{position:relative;display:inline-block;width:44px;height:24px;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:12px;transition:.3s;}
+.toggle-slider:before{position:absolute;content:'';height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
+.toggle-switch input:checked + .toggle-slider{background:var(--green);}
+.toggle-switch input:checked + .toggle-slider:before{transform:translateX(20px);}
+
+.badge-linked{background:var(--green-dim);color:var(--green);border:1px solid transparent;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+
+@media(max-width:600px){
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .topbar{padding:0 16px;}.content{padding:16px;}
+  .nav-tabs{padding:0 16px;}
+  .modal-body,.modal-header,.modal-footer{padding-left:16px;padding-right:16px;}
+  .form-grid{grid-template-columns:1fr;}.form-grid .span2{grid-column:span 1;}
+}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">KM Entregas</div>
+    <div class="login-title">Bem-vindo</div>
+    <div class="login-sub">Faça login para continuar</div>
+    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email"></div>
+    <div class="field"><label>Senha</label><input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()" id="login-btn">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo">KM Entregas</div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-ctx" id="topbar-ctx">—</div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-badge">
+        <div class="user-avatar" id="topbar-avatar">K</div>
+        <div class="user-name" id="topbar-name">—</div>
+      </div>
+      <span class="role-pill" id="topbar-role">—</span>
+      <button class="btn btn-ghost" onclick="openMyAccount()" style="padding:6px 12px;">🔑 Senha</button>
+      <button class="btn btn-ghost" onclick="doLogout()" style="padding:6px 12px;">Sair</button>
+    </div>
+  </div>
+  <div class="nav-tabs" id="nav-tabs"></div>
+  <div class="content">
+
+    <!-- SUPERADMIN -->
+    <div class="page" id="page-sa-companies">
+      <div class="page-header"><div><h1>Empresas</h1><p>Clientes da plataforma</p></div><button class="btn btn-primary" onclick="openModal('modal-sa-company')">+ Nova Empresa</button></div>
+      <div id="sa-companies-list"></div>
+    </div>
+    <div class="page" id="page-sa-carriers">
+      <div class="page-header"><div><h1>Transportadoras</h1><p>Todas na plataforma</p></div><button class="btn btn-primary" onclick="openSACreateCarrier()">+ Nova Transportadora</button></div>
+      <div id="sa-carriers-list"></div>
+    </div>
+
+    <!-- SUPERADMIN: Usuários globais -->
+    <div class="page" id="page-sa-users">
+      <div class="page-header"><div><h1>Todos os Usuários</h1><p>Gerenciar usuários da plataforma</p></div><button class="btn btn-primary" onclick="openModal('modal-sa-user')">+ Novo Usuário</button></div>
+      <div class="search-wrap" style="margin-bottom:16px;"><input type="text" id="search-sa-users" placeholder="🔍  Buscar por nome, email, empresa..." oninput="renderSAUsers()"></div>
+      <div class="card" id="sa-users-list"></div>
+    </div>
+
+    <!-- SUPERADMIN: Ordens globais -->
+    <div class="page" id="page-sa-orders">
+      <div class="page-header"><div><h1>Todas as Ordens</h1><p>Visão global da plataforma</p></div>
+        <button class="btn btn-ghost" onclick="exportOrders()">⬇ Exportar CSV</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="field" style="margin:0;flex:1;min-width:180px;"><label>Empresa</label><select id="filter-company" onchange="loadSAOrders()"><option value="">Todas as empresas</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:180px;"><label>Transportadora</label><select id="filter-carrier" onchange="loadSAOrders()"><option value="">Todas</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:160px;"><label>Motorista</label><select id="filter-driver" onchange="loadSAOrders()"><option value="">Todos</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Status</label><select id="filter-status" onchange="loadSAOrders()"><option value="">Todos</option><option value="pendente">Pendente</option><option value="atribuido">Atribuído</option><option value="coletado">Coletado</option><option value="entregue">Entregue</option><option value="problema">Problema</option><option value="arquivado">Arquivado</option></select></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Data início</label><input type="date" id="filter-date-from" onchange="loadSAOrders()"></div>
+        <div class="field" style="margin:0;flex:1;min-width:140px;"><label>Data fim</label><input type="date" id="filter-date-to" onchange="loadSAOrders()"></div>
+      </div>
+      <div id="sa-orders-stats" style="margin-bottom:16px;"></div>
+      <div id="sa-orders-list"></div>
+    </div>
+
+    <!-- EMPRESA -->
+    <div class="page" id="page-emp-dashboard">
+      <div class="page-header"><div><h1>Dashboard</h1><p id="emp-company-name">—</p></div><button class="btn btn-primary" onclick="openNewOrderModal()">+ Nova Ordem</button></div>
+      <div class="stats-row" id="emp-stats"></div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">Todas</button>
+        <button class="filter-btn" data-filter="pendente" onclick="setFilter('pendente',this)">Pendentes</button>
+        <button class="filter-btn" data-filter="atribuido" onclick="setFilter('atribuido',this)">Atribuídas</button>
+        <button class="filter-btn" data-filter="coletado" onclick="setFilter('coletado',this)">Coletadas</button>
+        <button class="filter-btn" data-filter="entregue" onclick="setFilter('entregue',this)">Entregues</button>
+        <button class="filter-btn" data-filter="problema" onclick="setFilter('problema',this)">Problemas</button>
+        <button class="filter-btn" data-filter="arquivado" onclick="setFilter('arquivado',this)">🗄 Arquivo</button>
+      </div>
+      <div class="search-wrap"><input type="text" id="search-orders" placeholder="🔍  Buscar por item, endereço, responsável..." oninput="renderOrders()"></div>
+      <div id="orders-list"></div>
+    </div>
+    <div class="page" id="page-emp-carriers">
+      <div class="page-header"><div><h1>Transportadoras</h1><p>Vinculadas à sua empresa</p></div><button class="btn btn-primary" onclick="openModal('modal-add-carrier')">+ Adicionar Transportadora</button></div>
+      <div id="emp-carriers-list"></div>
+    </div>
+    <div class="page" id="page-emp-users">
+      <div class="page-header"><div><h1>Usuários</h1><p>Equipe da sua empresa</p></div><button class="btn btn-primary" onclick="openModal('modal-emp-user')">+ Novo Usuário</button></div>
+      <div class="card" id="emp-users-list"></div>
+    </div>
+
+    <!-- TRANSPORTADORA -->
+    <div class="page" id="page-car-orders">
+      <div class="page-header"><div><h1>Ordens</h1><p id="car-date-label">—</p></div><button class="btn btn-ghost" onclick="loadCarrierOrders()">↻ Atualizar</button></div>
+      <div id="car-delegation-banner"></div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilterC('all',this)">Todas</button>
+        <button class="filter-btn" data-filter="pendente" onclick="setFilterC('pendente',this)">Pendentes</button>
+        <button class="filter-btn" data-filter="atribuido" onclick="setFilterC('atribuido',this)">Atribuídas</button>
+        <button class="filter-btn" data-filter="coletado" onclick="setFilterC('coletado',this)">Coletadas</button>
+        <button class="filter-btn" data-filter="entregue" onclick="setFilterC('entregue',this)">Entregues</button>
+      </div>
+      <div id="car-orders-list"></div>
+    </div>
+    <div class="page" id="page-car-drivers">
+      <div class="page-header"><div><h1>Motoristas</h1><p>Equipe da transportadora</p></div><button class="btn btn-primary" onclick="openModal('modal-car-driver')">+ Novo Motorista</button></div>
+      <div class="card" id="car-drivers-list"></div>
+    </div>
+    <div class="page" id="page-car-settings">
+      <div class="page-header"><div><h1>Configurações</h1><p>Modo de operação</p></div></div>
+      <div class="card" id="car-settings-body"></div>
+    </div>
+
+    <!-- MOTORISTA -->
+    <div class="page" id="page-driver-orders">
+      <div class="page-header"><div><h1>Minhas Ordens</h1><p id="driver-date-label">—</p></div><button class="btn btn-ghost" onclick="loadDriverOrders()">↻ Atualizar</button></div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilterD('all',this)">Todas</button>
+        <button class="filter-btn" data-filter="pendente,atribuido" onclick="setFilterD('pendente,atribuido',this)">Pendentes</button>
+        <button class="filter-btn" data-filter="coletado" onclick="setFilterD('coletado',this)">Coletadas</button>
+        <button class="filter-btn" data-filter="entregue" onclick="setFilterD('entregue',this)">Entregues</button>
+      </div>
+      <div id="driver-orders-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODALS SUPERADMIN -->
+<div class="modal-overlay" id="modal-sa-company">
+  <div class="modal">
+    <div class="modal-header"><h2>Nova Empresa</h2><button class="modal-close" onclick="closeModal('modal-sa-company')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field span2"><label>Razão Social</label><input type="text" id="sc-name" placeholder="Nome da empresa"></div>
+        <div class="field"><label>CPF ou CNPJ</label><input type="text" id="sc-doc" placeholder="00.000.000/0001-00"></div>
+        <div class="field span2"><label>Endereço</label><input type="text" id="sc-address" placeholder="Rua, número, cidade, estado"></div>
+        <div class="field"><label>Nome do Responsável</label><input type="text" id="sc-contact" placeholder="Nome completo"></div>
+        <div class="field"><label>WhatsApp</label><input type="text" id="sc-whatsapp" placeholder="(11) 99999-9999"></div>
+        <div class="field span2"><label>Email (login do admin)</label><input type="email" id="sc-email" placeholder="admin@empresa.com"></div>
+        <div class="field span2"><label>Senha do Admin</label><input type="password" id="sc-pass" placeholder="mínimo 6 caracteres"></div>
+        <div class="field span2"><label>Nome do Admin</label><input type="text" id="sc-admin-name" placeholder="Nome do administrador"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-company')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createCompany()">Criar Empresa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nova Transportadora SA -->
+<div class="modal-overlay" id="modal-sa-carrier">
+  <div class="modal">
+    <div class="modal-header"><h2>Nova Transportadora</h2><button class="modal-close" onclick="closeModal('modal-sa-carrier')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field span2"><label>Nome da Transportadora</label><input type="text" id="sac-name" placeholder="Nome ou razão social"></div>
+        <div class="field"><label>CPF ou CNPJ</label><input type="text" id="sac-doc" placeholder="000.000.000-00"></div>
+        <div class="field"><label>Nome do Responsável</label><input type="text" id="sac-contact" placeholder="Nome completo"></div>
+        <div class="field"><label>WhatsApp</label><input type="text" id="sac-whatsapp" placeholder="(11) 99999-9999"></div>
+        <div class="field span2"><label>Email (login do admin)</label><input type="email" id="sac-email" placeholder="admin@transportadora.com"></div>
+        <div class="field"><label>Senha do Admin</label><input type="password" id="sac-pass" placeholder="mínimo 6 caracteres"></div>
+        <div class="field"><label>Nome do Admin</label><input type="text" id="sac-admin-name" placeholder="Nome do administrador"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-carrier')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createSACarrier()">Criar Transportadora</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Motoristas da Transportadora (SA) -->
+<div class="modal-overlay" id="modal-sa-drivers">
+  <div class="modal">
+    <div class="modal-header"><h2 id="sa-drivers-title">Motoristas</h2><button class="modal-close" onclick="closeModal('modal-sa-drivers')">×</button></div>
+    <div class="modal-body">
+      <div id="sa-drivers-list" style="margin-bottom:16px;"></div>
+      <div class="divider"></div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Adicionar Motorista</div>
+      <div class="field"><label>Nome</label><input type="text" id="sad-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="sad-email" placeholder="motorista@transportadora.com"></div>
+      <div class="field"><label>Senha</label><input type="password" id="sad-pass" placeholder="mínimo 6 caracteres"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-drivers')">Fechar</button>
+      <button class="btn btn-primary" onclick="createSADriver()">Adicionar Motorista</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Novo Usuário SA -->
+<div class="modal-overlay" id="modal-sa-user">
+  <div class="modal">
+    <div class="modal-header"><h2 id="sa-user-modal-title">Novo Usuário</h2><button class="modal-close" onclick="closeModal('modal-sa-user')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome</label><input type="text" id="sau-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="sau-email" placeholder="email@exemplo.com"></div>
+      <div class="field" id="sau-pass-wrap"><label>Senha</label><input type="password" id="sau-pass" placeholder="mínimo 6 caracteres"></div>
+      <div class="field"><label>Perfil</label>
+        <select id="sau-role" onchange="toggleSAUserContext()">
+          <option value="superadmin">Super Admin</option>
+          <option value="admin_empresa">Admin Empresa</option>
+          <option value="solicitante">Solicitante</option>
+          <option value="admin_transportadora">Admin Transportadora</option>
+          <option value="motorista">Motorista</option>
+        </select>
+      </div>
+      <div class="field" id="sau-company-wrap" style="display:none;"><label>Empresa</label><select id="sau-company"><option value="">Selecione...</option></select></div>
+      <div class="field" id="sau-carrier-wrap" style="display:none;"><label>Transportadora</label><select id="sau-carrier"><option value="">Selecione...</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-sa-user')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createSAUser()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD CARRIER (empresa vincula transportadora) -->
+<div class="modal-overlay" id="modal-add-carrier">
+  <div class="modal">
+    <div class="modal-header"><h2>Adicionar Transportadora</h2><button class="modal-close" onclick="closeModal('modal-add-carrier')">×</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Email da Transportadora</label>
+        <div style="display:flex;gap:8px;">
+          <input type="email" id="carrier-search-email" placeholder="email@transportadora.com" style="flex:1;">
+          <button class="btn btn-ghost" onclick="searchCarrierByEmail()">Buscar</button>
+        </div>
+      </div>
+      <div id="carrier-search-result" style="margin-bottom:16px;"></div>
+      <div id="carrier-new-form" style="display:none;">
+        <div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-size:13px;">
+          ℹ️ Transportadora não encontrada. Preencha os dados para cadastrá-la.
+        </div>
+        <div class="form-grid">
+          <div class="field span2"><label>Nome da Transportadora</label><input type="text" id="cn-name" placeholder="Nome ou razão social"></div>
+          <div class="field"><label>CPF ou CNPJ</label><input type="text" id="cn-doc" placeholder="000.000.000-00"></div>
+          <div class="field"><label>Nome do Responsável</label><input type="text" id="cn-contact" placeholder="Nome completo"></div>
+          <div class="field"><label>WhatsApp</label><input type="text" id="cn-whatsapp" placeholder="(11) 99999-9999"></div>
+          <div class="field"><label>Senha de Acesso</label><input type="password" id="cn-pass" placeholder="mínimo 6 caracteres"></div>
+          <div class="field"><label>Nome do Admin</label><input type="text" id="cn-admin-name" placeholder="Nome do responsável"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-carrier')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-link-carrier" style="display:none;" onclick="linkCarrier()">Vincular</button>
+      <button class="btn btn-primary" id="btn-create-carrier" style="display:none;" onclick="createAndLinkCarrier()">Cadastrar e Vincular</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nova Ordem -->
+<div class="modal-overlay" id="modal-order">
+  <div class="modal">
+    <div class="modal-header"><h2>Nova Ordem</h2><button class="modal-close" onclick="closeModal('modal-order')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field span2"><label>Transportadora</label><select id="o-carrier"><option value="">Selecione a transportadora...</option></select></div>
+        <div class="field span2"><label>Descrição do Item</label><input type="text" id="o-item" placeholder="Ex: Cenário de palco, maleta de produtos..."></div>
+        <div class="field"><label>Quantidade</label><input type="number" id="o-qty" min="1" value="1"></div>
+        <div class="field"><label>Data da Entrega</label><input type="date" id="o-date"></div>
+        <div class="field span2"><label>Endereço de Coleta</label><input type="text" id="o-pickup-addr" placeholder="Rua, número, bairro, cidade"></div>
+        <div class="field"><label>Horário de Coleta</label><input type="time" id="o-pickup-time"></div>
+        <div class="field"><label>Responsável na Coleta</label><input type="text" id="o-pickup-resp" placeholder="Nome do responsável"></div>
+        <div class="field span2"><label>Endereço de Entrega</label><input type="text" id="o-delivery-addr" placeholder="Rua, número, bairro, cidade"></div>
+        <div class="field"><label>Horário de Entrega</label><input type="time" id="o-delivery-time"></div>
+        <div class="field"><label>Responsável pelo Recebimento</label><input type="text" id="o-delivery-resp" placeholder="Nome do responsável"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-order')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createOrder()">Criar Ordem</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Ver Ordem -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal">
+    <div class="modal-header"><h2 id="view-title">Ordem</h2><button class="modal-close" onclick="closeModal('modal-view')">×</button></div>
+    <div class="modal-body" id="view-body"></div>
+    <div class="modal-footer" id="view-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-view')">Fechar</button>
+      <button class="btn btn-ghost" onclick="downloadRecibo()">⬇ Recibo PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Detalhe transportadora/motorista -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-header"><h2 id="detail-title">Ordem</h2><button class="modal-close" onclick="closeModal('modal-detail')">×</button></div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<!-- MODAL: Atribuir motorista -->
+<div class="modal-overlay" id="modal-assign">
+  <div class="modal">
+    <div class="modal-header"><h2>Atribuir Motorista</h2><button class="modal-close" onclick="closeModal('modal-assign')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Selecionar Motorista</label><select id="assign-driver"><option value="">Selecione...</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-assign')">Cancelar</button>
+      <button class="btn btn-primary" onclick="assignDriver()">Atribuir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Usuário empresa -->
+<div class="modal-overlay" id="modal-emp-user">
+  <div class="modal">
+    <div class="modal-header"><h2>Novo Usuário</h2><button class="modal-close" onclick="closeModal('modal-emp-user')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome</label><input type="text" id="eu-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="eu-email" placeholder="email@empresa.com"></div>
+      <div class="field"><label>Senha</label><input type="password" id="eu-pass" placeholder="mínimo 6 caracteres"></div>
+      <div class="field"><label>Perfil</label><select id="eu-role"><option value="solicitante">Solicitante</option><option value="admin_empresa">Admin</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-emp-user')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createEmpUser()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Motorista transportadora -->
+<div class="modal-overlay" id="modal-car-driver">
+  <div class="modal">
+    <div class="modal-header"><h2>Novo Motorista</h2><button class="modal-close" onclick="closeModal('modal-car-driver')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome</label><input type="text" id="cd-name" placeholder="Nome completo"></div>
+      <div class="field"><label>Email</label><input type="email" id="cd-email" placeholder="motorista@transportadora.com"></div>
+      <div class="field"><label>Senha</label><input type="password" id="cd-pass" placeholder="mínimo 6 caracteres"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-car-driver')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createDriver()">Criar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL: Trocar/Resetar Senha -->
+<div class="modal-overlay" id="modal-password">
+  <div class="modal">
+    <div class="modal-header"><h2 id="pass-modal-title">Trocar Senha</h2><button class="modal-close" onclick="closeModal('modal-password')">×</button></div>
+    <div class="modal-body">
+      <div id="pass-current-wrap" class="field">
+        <label>Senha Atual</label>
+        <input type="password" id="pass-current" placeholder="Sua senha atual">
+      </div>
+      <div class="field"><label>Nova Senha</label><input type="password" id="pass-new" placeholder="mínimo 6 caracteres"></div>
+      <div class="field"><label>Confirmar Nova Senha</label><input type="password" id="pass-confirm" placeholder="repita a nova senha"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-password')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitChangePassword()">Salvar</button>
+    </div>
+  </div>
+</div>
+<script>
+// ── API CLIENT — todas as chamadas vão para as Edge Functions no servidor ──
+const API = {
+  async call(path, options = {}) {
+    const res = await fetch('/api/' + path, {
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      ...options
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro na requisição');
+    return data;
+  },
+  post(path, body) { return this.call(path, { method: 'POST', body: JSON.stringify(body) }); },
+  get(path) { return this.call(path); },
+  patch(path, body) { return this.call(path, { method: 'PATCH', body: JSON.stringify(body) }); },
+  delete(path) { return this.call(path, { method: 'DELETE' }) },
+};
+
+let CU = null; // currentUser
+let allOrders = [], allOrdersArchived = [], allCarrierOrders = [], allDriverOrders = [];
+let currentFilter = 'all', currentFilterC = 'all', currentFilterD = 'all';
+let activeOrderId = null, activeCarrierId = null;
+let sigCanvases = {};
+
+// ── UTILS ──
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 3500);
+}
+// hashPass moved to server-side only
+function fmtDate(d) { if(!d) return '—'; return new Date(d).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function fmtDateOnly(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; }
+function todayISO() { return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'}); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function statusLabel(s) {
+  const map={pendente:'Pendente',atribuido:'Atribuído',coletado:'Coletado',entregue:'Entregue',problema:'Problema',arquivado:'Arquivado'};
+  return `<span class="status status-${s}">${map[s]||s}</span>`;
+}
+function roleLabel(r) {
+  const map={superadmin:'Super Admin',admin_empresa:'Admin Empresa',solicitante:'Solicitante',admin_transportadora:'Admin Transportadora',motorista:'Motorista'};
+  return map[r]||r;
+}
+
+// ── AUTH ──
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const password = document.getElementById('login-pass').value;
+  if (!email||!password) { toast('Preencha email e senha','error'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled=true; btn.textContent='Entrando...';
+  try {
+    const { user } = await API.post('login', { email, password });
+    CU = user;
+    sessionStorage.setItem('km_user', JSON.stringify(user));
+    showApp();
+  } catch(e) {
+    toast(e.message || 'Erro ao fazer login','error');
+  }
+  btn.disabled=false; btn.textContent='Entrar';
+}
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('login-email').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
+
+function doLogout() {
+  CU=null; sessionStorage.removeItem('km_user');
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+// ── APP INIT ──
+function showApp() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('topbar-name').textContent = CU.name;
+  document.getElementById('topbar-avatar').textContent = CU.name[0].toUpperCase();
+  const rp = document.getElementById('topbar-role');
+  rp.textContent = roleLabel(CU.role); rp.className = `role-pill role-${CU.role}`;
+  let ctx = '';
+  if (CU.role==='superadmin') ctx='Super Admin';
+  else if (CU.companies) ctx=CU.companies.name;
+  else if (CU.carriers) ctx=CU.carriers.name;
+  document.getElementById('topbar-ctx').textContent = ctx;
+  buildNav();
+}
+
+function buildNav() {
+  const nav = document.getElementById('nav-tabs'); nav.innerHTML='';
+  let tabs=[], firstPage='';
+  if (CU.role==='superadmin') {
+    tabs=[
+      {id:'page-sa-companies',label:'🏢 Empresas'},
+      {id:'page-sa-carriers',label:'🚚 Transportadoras'},
+      {id:'page-sa-users',label:'👥 Usuários'},
+      {id:'page-sa-orders',label:'📦 Ordens'}
+    ];
+    firstPage='page-sa-companies';
+  } else if (CU.role==='admin_empresa'||CU.role==='solicitante') {
+    tabs=[{id:'page-emp-dashboard',label:'Dashboard'},{id:'page-emp-carriers',label:'Transportadoras'}];
+    if (CU.role==='admin_empresa') tabs.push({id:'page-emp-users',label:'Usuários'});
+    firstPage='page-emp-dashboard';
+  } else if (CU.role==='admin_transportadora') {
+    tabs=[{id:'page-car-orders',label:'Ordens'},{id:'page-car-drivers',label:'Motoristas'},{id:'page-car-settings',label:'Configurações'}];
+    firstPage='page-car-orders';
+  } else {
+    tabs=[{id:'page-driver-orders',label:'Minhas Ordens'}];
+    firstPage='page-driver-orders';
+  }
+  tabs.forEach(t => {
+    const el=document.createElement('div');
+    el.className='nav-tab'; el.textContent=t.label;
+    el.onclick=()=>showPage(t.id); el.dataset.page=t.id;
+    nav.appendChild(el);
+  });
+  showPage(firstPage);
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.page===id));
+  document.getElementById(id).classList.add('active');
+  if(id==='page-sa-companies') loadSACompanies();
+  if(id==='page-sa-carriers') loadSACarriers();
+  if(id==='page-sa-users') loadSAUsers();
+  if(id==='page-sa-orders') initSAOrders();
+  if(id==='page-emp-dashboard') loadDashboard();
+  if(id==='page-emp-carriers') loadEmpCarriers();
+  if(id==='page-emp-users') loadEmpUsers();
+  if(id==='page-car-orders') loadCarrierOrders();
+  if(id==='page-car-drivers') loadCarDrivers();
+  if(id==='page-car-settings') loadCarSettings();
+  if(id==='page-driver-orders') loadDriverOrders();
+}
+
+// ── SUPERADMIN ──
+async function loadSACompanies() {
+  const data = await API.get('companies?type=company');
+  const list = document.getElementById('sa-companies-list');
+  if (!data||!data.length) { list.innerHTML='<div class="empty"><div class="empty-icon">🏢</div><h3>Nenhuma empresa</h3><p>Crie a primeira empresa</p></div>'; return; }
+  list.innerHTML = data.map(c=>`
+    <div class="entity-card">
+      <div class="entity-row">
+        <div class="entity-info">
+          <div class="entity-name">${c.name}</div>
+          <div class="entity-meta">${c.document} · ${c.contact_name} · ${c.contact_whatsapp}</div>
+          <div class="entity-meta">${c.contact_email} · ${c.address}</div>
+        </div>
+        <div class="entity-actions">
+          <span class="status status-${c.active?'ativo':'inativo'}">${c.active?'Ativa':'Inativa'}</span>
+          <label class="toggle-switch"><input type="checkbox" ${c.active?'checked':''} onchange="toggleEntity('companies','${c.id}',this.checked)"><span class="toggle-slider"></span></label>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteCompany('${c.id}','${c.name.replace(/'/g,"\\'")}')">🗑</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createCompany() {
+  const name=document.getElementById('sc-name').value.trim();
+  const doc=document.getElementById('sc-doc').value.trim();
+  const address=document.getElementById('sc-address').value.trim();
+  const contact=document.getElementById('sc-contact').value.trim();
+  const whatsapp=document.getElementById('sc-whatsapp').value.trim();
+  const email=document.getElementById('sc-email').value.trim().toLowerCase();
+  const pass=document.getElementById('sc-pass').value;
+  const adminName=document.getElementById('sc-admin-name').value.trim();
+  if(!name||!doc||!address||!contact||!whatsapp||!email||!pass||!adminName){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  await API.post('companies?type=company', {name, document:doc, address, contact_name:contact, contact_whatsapp:whatsapp, contact_email:email, admin_password:pass, admin_name:adminName});
+  toast(`Empresa "${name}" criada!`,'success');
+  closeModal('modal-sa-company');
+  ['sc-name','sc-doc','sc-address','sc-contact','sc-whatsapp','sc-email','sc-pass','sc-admin-name'].forEach(id=>document.getElementById(id).value='');
+  loadSACompanies();
+}
+
+async function toggleEntity(table, id, active) {
+  await API.patch('companies?type='+(table==='companies'?'company':'carrier'), {id, active});
+  toast(active?'Ativado':'Desativado', active?'success':'info');
+  if(table==='companies') loadSACompanies(); else loadSACarriers();
+}
+
+async function deleteCompany(id,name) {
+  if(!confirm(`⚠️ Excluir empresa "${name}"?\n\nTodos os dados serão removidos. Irreversível.`)) return;
+  await API.delete('companies?type=company&id='+id);
+  toast('Empresa excluída','info'); loadSACompanies();
+}
+
+async function loadSACarriers() {
+  const data=await API.get('companies?type=carrier');
+  const list=document.getElementById('sa-carriers-list');
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><h3>Nenhuma transportadora</h3><p>Crie a primeira ou aguarde empresas cadastrarem</p></div>';return;}
+  list.innerHTML=data.map(c=>`
+    <div class="entity-card">
+      <div class="entity-row">
+        <div class="entity-info">
+          <div class="entity-name">${c.name}</div>
+          <div class="entity-meta">${c.document} · ${c.contact_name} · ${c.contact_whatsapp}</div>
+          <div class="entity-meta">${c.contact_email} · Modo: ${c.delegation_mode?'Delegação':'Livre'}</div>
+        </div>
+        <div class="entity-actions">
+          <span class="status status-${c.active?'ativo':'inativo'}">${c.active?'Ativa':'Inativa'}</span>
+          <label class="toggle-switch"><input type="checkbox" ${c.active?'checked':''} onchange="toggleEntity('carriers','${c.id}',this.checked)"><span class="toggle-slider"></span></label>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openSADrivers('${c.id}','${c.name.replace(/'/g,"\'")}')">👥 Motoristas</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteSACarrier('${c.id}','${c.name.replace(/'/g,"\'")}')">🗑</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openSACreateCarrier() {
+  ['sac-name','sac-doc','sac-contact','sac-whatsapp','sac-email','sac-pass','sac-admin-name'].forEach(id=>document.getElementById(id).value='');
+  openModal('modal-sa-carrier');
+}
+
+async function createSACarrier() {
+  const name=document.getElementById('sac-name').value.trim();
+  const doc=document.getElementById('sac-doc').value.trim();
+  const contact=document.getElementById('sac-contact').value.trim();
+  const whatsapp=document.getElementById('sac-whatsapp').value.trim();
+  const email=document.getElementById('sac-email').value.trim().toLowerCase();
+  const pass=document.getElementById('sac-pass').value;
+  const adminName=document.getElementById('sac-admin-name').value.trim();
+  if(!name||!doc||!contact||!whatsapp||!email||!pass||!adminName){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  await API.post('companies?type=carrier', {name, document:doc, contact_name:contact, contact_whatsapp:whatsapp, contact_email:email, admin_password:pass, admin_name:adminName});
+  toast(`Transportadora "${name}" criada!`,'success');
+  closeModal('modal-sa-carrier');
+  loadSACarriers();
+}
+
+async function deleteSACarrier(id, name) {
+  if(!confirm(`⚠️ Excluir transportadora "${name}"?
+
+Todos os motoristas serão removidos. Irreversível.`)) return;
+  await API.delete('companies?type=carrier&id='+id);
+  toast('Transportadora excluída','info'); loadSACarriers();
+}
+
+let _saDriversCarrierId = null;
+async function openSADrivers(carrierId, carrierName) {
+  _saDriversCarrierId = carrierId;
+  document.getElementById('sa-drivers-title').textContent = `Motoristas — ${carrierName}`;
+  ['sad-name','sad-email','sad-pass'].forEach(id=>document.getElementById(id).value='');
+  await loadSADriversList();
+  openModal('modal-sa-drivers');
+}
+
+async function loadSADriversList() {
+  const data=await API.get('users?carrier_id='+_saDriversCarrierId);
+  const list=document.getElementById('sa-drivers-list');
+  if(!data||!data.length){list.innerHTML='<div style="color:var(--text-muted);font-size:13px;">Nenhum motorista cadastrado.</div>';return;}
+  list.innerHTML=data.map(d=>`
+    <div class="entity-row" style="padding:8px 0;">
+      <div class="entity-info">
+        <div class="entity-name" style="font-size:13px;">${d.name}</div>
+        <div class="entity-meta">${d.email}</div>
+      </div>
+      <div class="entity-actions">
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;" onclick="openResetPassword('${d.id}','${d.name.replace(/'/g,"\'")}')">🔑 Reset</button>
+        <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="deleteSADriverFromModal('${d.id}','${d.name.replace(/'/g,"\'")}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createSADriver() {
+  const name=document.getElementById('sad-name').value.trim();
+  const email=document.getElementById('sad-email').value.trim().toLowerCase();
+  const pass=document.getElementById('sad-pass').value;
+  if(!name||!email||!pass){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  await API.post('users', {name, email, password:pass, role:'motorista', carrier_id:_saDriversCarrierId});
+  toast('Motorista adicionado!','success');
+  ['sad-name','sad-email','sad-pass'].forEach(id=>document.getElementById(id).value='');
+  loadSADriversList();
+}
+
+async function deleteSADriverFromModal(id, name) {
+  if(!confirm(`Remover motorista "${name}"?`)) return;
+  await API.delete('users?id='+id);
+  toast('Removido','info'); loadSADriversList();
+}
+
+// ── SUPERADMIN: USERS ──
+let allSAUsers = [];
+
+async function loadSAUsers() {
+  const data = await API.get('users');
+  allSAUsers = data || [];
+  // Populate filter dropdowns
+  renderSAUsers();
+}
+
+function renderSAUsers() {
+  const q = (document.getElementById('search-sa-users')?.value||'').toLowerCase().trim();
+  let pool = allSAUsers;
+  if (q) pool = pool.filter(u=>
+    u.name.toLowerCase().includes(q)||
+    u.email.toLowerCase().includes(q)||
+    (u.companies?.name||'').toLowerCase().includes(q)||
+    (u.carriers?.name||'').toLowerCase().includes(q)
+  );
+  const list = document.getElementById('sa-users-list');
+  if (!pool.length) { list.innerHTML='<div class="empty"><div class="empty-icon">👥</div><h3>Nenhum usuário</h3></div>'; return; }
+  list.innerHTML = pool.map(u=>`
+    <div class="entity-row">
+      <div class="entity-info">
+        <div class="entity-name">${u.name}</div>
+        <div class="entity-meta">${u.email} · ${u.companies?.name||u.carriers?.name||'—'} · Criado em ${fmtDate(u.created_at)}</div>
+      </div>
+      <div class="entity-actions">
+        <span class="role-pill role-${u.role}">${roleLabel(u.role)}</span>
+        ${u.id!==CU.id?`
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${u.id}','${u.name.replace(/'/g,"\'")}')">🔑 Reset</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteSAUser('${u.id}','${u.name.replace(/'/g,"\'")}')">🗑</button>
+        `:'<span style="font-size:11px;color:var(--text-muted);">você</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleSAUserContext() {
+  const role = document.getElementById('sau-role').value;
+  const compWrap = document.getElementById('sau-company-wrap');
+  const carWrap = document.getElementById('sau-carrier-wrap');
+  compWrap.style.display = ['admin_empresa','solicitante'].includes(role) ? 'flex' : 'none';
+  carWrap.style.display = ['admin_transportadora','motorista'].includes(role) ? 'flex' : 'none';
+
+  if (['admin_empresa','solicitante'].includes(role)) {
+    const data = await API.get('companies?type=company');
+    const sel = document.getElementById('sau-company');
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    (data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }
+  if (['admin_transportadora','motorista'].includes(role)) {
+    const data = await API.get('companies?type=carrier');
+    const sel = document.getElementById('sau-carrier');
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    (data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);});
+  }
+}
+
+async function createSAUser() {
+  const name = document.getElementById('sau-name').value.trim();
+  const email = document.getElementById('sau-email').value.trim().toLowerCase();
+  const pass = document.getElementById('sau-pass').value;
+  const role = document.getElementById('sau-role').value;
+  const companyId = document.getElementById('sau-company')?.value||null;
+  const carrierId = document.getElementById('sau-carrier')?.value||null;
+  if (!name||!email||!pass) { toast('Preencha todos os campos','error'); return; }
+  if (pass.length<6) { toast('Senha mínima 6 caracteres','error'); return; }
+  if (['admin_empresa','solicitante'].includes(role) && !companyId) { toast('Selecione a empresa','error'); return; }
+  if (['admin_transportadora','motorista'].includes(role) && !carrierId) { toast('Selecione a transportadora','error'); return; }
+  const payload = {name,email,password_hash:hashPass(pass),role};
+  if (companyId) payload.company_id = companyId;
+  if (carrierId) payload.carrier_id = carrierId;
+  await API.post('users', {...payload, password: payload.password_hash, password_hash: undefined});
+  toast('Usuário criado!','success');
+  closeModal('modal-sa-user');
+  ['sau-name','sau-email','sau-pass'].forEach(id=>document.getElementById(id).value='');
+  loadSAUsers();
+}
+
+async function deleteSAUser(id, name) {
+  if (!confirm(`Remover usuário "${name}"?`)) return;
+  await API.delete('users?id='+id);
+  toast('Usuário removido','info'); loadSAUsers();
+}
+
+// ── SUPERADMIN: ORDERS ──
+let allSAOrders = [];
+
+async function initSAOrders() {
+  // Populate company filter
+  const companies = await API.get('companies?type=company');
+  const selC = document.getElementById('filter-company');
+  selC.innerHTML = '<option value="">Todas as empresas</option>';
+  (companies||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;selC.appendChild(o);});
+
+  // Populate carrier filter
+  const carriers = await API.get('companies?type=carrier');
+  const selCar = document.getElementById('filter-carrier');
+  selCar.innerHTML = '<option value="">Todas</option>';
+  (carriers||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;selCar.appendChild(o);});
+
+  // Populate driver filter
+  const drivers = (await API.get('users')).filter(u=>u.role==='motorista');
+  const selD = document.getElementById('filter-driver');
+  selD.innerHTML = '<option value="">Todos</option>';
+  (drivers||[]).forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.name;selD.appendChild(o);});
+
+  await loadSAOrders();
+}
+
+async function loadSAOrders() {
+  const companyId = document.getElementById('filter-company')?.value;
+  const carrierId = document.getElementById('filter-carrier')?.value;
+  const driverId = document.getElementById('filter-driver')?.value;
+  const status = document.getElementById('filter-status')?.value;
+  const dateFrom = document.getElementById('filter-date-from')?.value;
+  const dateTo = document.getElementById('filter-date-to')?.value;
+
+  let params = 'orders?';
+  if (companyId) params += 'company_id='+companyId+'&';
+  if (carrierId) params += 'carrier_id='+carrierId+'&';
+  if (driverId) params += 'driver_id='+driverId+'&';
+  if (status) params += 'status='+status+'&';
+  if (dateFrom) params += 'date_from='+dateFrom+'&';
+  if (dateTo) params += 'date_to='+dateTo+'&';
+
+  const data = await API.get(params.replace(/&$/,''));
+  allSAOrders = data || [];
+  renderSAOrders();
+}
+
+function renderSAOrders() {
+  const list = document.getElementById('sa-orders-list');
+  const stats = document.getElementById('sa-orders-stats');
+  const total = allSAOrders.length;
+  const entregue = allSAOrders.filter(o=>o.status==='entregue').length;
+  const problema = allSAOrders.filter(o=>o.status==='problema').length;
+  const pendente = allSAOrders.filter(o=>['pendente','atribuido'].includes(o.status)).length;
+
+  stats.innerHTML = `<div class="stats-row" style="margin-bottom:0;">
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value orange">${pendente}</div></div>
+    <div class="stat-card"><div class="stat-label">Entregues</div><div class="stat-value green">${entregue}</div></div>
+    <div class="stat-card"><div class="stat-label">Problemas</div><div class="stat-value red">${problema}</div></div>
+  </div>`;
+
+  if (!allSAOrders.length) { list.innerHTML='<div class="empty"><div class="empty-icon">📦</div><h3>Nenhuma ordem</h3><p>Ajuste os filtros</p></div>'; return; }
+
+  list.innerHTML = allSAOrders.map(o=>`
+    <div class="card" onclick="viewOrder('${o.id}')" style="cursor:pointer;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">${o.companies?.name||'—'} → ${o.carriers?.name||'—'} ${o.users?'→ '+o.users.name:''} · ${fmtDateOnly(o.delivery_scheduled_date)}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Qtd</div><div class="info-value">${o.quantity}</div></div>
+        ${o.delivery_timestamp?`<div class="info-item"><div class="info-label">Entregue em</div><div class="info-value timestamp">${fmtDate(o.delivery_timestamp)}</div></div>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function exportOrders() {
+  if (!allSAOrders.length) { toast('Nenhuma ordem para exportar','error'); return; }
+  const headers = ['ID','Data','Item','Quantidade','Status','Empresa','Transportadora','Motorista','End. Coleta','Horário Coleta','Resp. Coleta','Coletado por','Timestamp Coleta','Item Conforme','Qtd Conforme','Obs. Coleta','End. Entrega','Horário Entrega','Resp. Entrega','Recebido por','Timestamp Entrega','Obs. Entrega'];
+  const rows = allSAOrders.map(o=>[
+    o.id,
+    o.delivery_scheduled_date,
+    `"${o.item_description}"`,
+    o.quantity,
+    o.status,
+    `"${o.companies?.name||''}"`,
+    `"${o.carriers?.name||''}"`,
+    `"${o.users?.name||''}"`,
+    `"${o.pickup_address}"`,
+    o.pickup_time,
+    `"${o.pickup_responsible}"`,
+    `"${o.collector_name||''}"`,
+    o.pickup_timestamp ? fmtDate(o.pickup_timestamp) : '',
+    o.item_confirmed===true?'Sim':o.item_confirmed===false?'Não':'',
+    o.quantity_confirmed===true?'Sim':o.quantity_confirmed===false?'Não':'',
+    `"${(o.pickup_notes||'').replace(/"/g,"'")}"`,
+    `"${o.delivery_address}"`,
+    o.delivery_scheduled_time,
+    `"${o.delivery_responsible}"`,
+    `"${o.receiver_name||''}"`,
+    o.delivery_timestamp ? fmtDate(o.delivery_timestamp) : '',
+    `"${(o.delivery_notes||'').replace(/"/g,"'")}"`
+  ].join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url;
+  const now = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+  a.download = `km-entregas-${now}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast(`${allSAOrders.length} ordens exportadas!`,'success');
+}
+
+// ── EMPRESA: CARRIERS ──
+async function loadEmpCarriers() {
+  const data=await API.get('companies?type=company_carriers&company_id='+CU.company_id);
+  const list=document.getElementById('emp-carriers-list');
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><h3>Nenhuma transportadora vinculada</h3><p>Adicione uma transportadora para criar ordens</p></div>';return;}
+  list.innerHTML=data.map(cc=>`
+    <div class="entity-card">
+      <div class="entity-row">
+        <div class="entity-info">
+          <div class="entity-name">${cc.carriers.name}</div>
+          <div class="entity-meta">${cc.carriers.document} · ${cc.carriers.contact_name} · ${cc.carriers.contact_whatsapp}</div>
+          <div class="entity-meta">${cc.carriers.contact_email}</div>
+        </div>
+        <div class="entity-actions">
+          <span class="badge-linked">Vinculada</span>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="unlinkCarrier('${cc.id}','${cc.carriers.name.replace(/'/g,"\\'")}')">Desvincular</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function searchCarrierByEmail() {
+  const email=document.getElementById('carrier-search-email').value.trim().toLowerCase();
+  if(!email){toast('Informe o email','error');return;}
+  const result=document.getElementById('carrier-search-result');
+  const newForm=document.getElementById('carrier-new-form');
+  const btnLink=document.getElementById('btn-link-carrier');
+  const btnCreate=document.getElementById('btn-create-carrier');
+
+  const carrierList=await API.get('companies?type=carrier');
+  const carrier=carrierList.find(c=>c.contact_email===email)||null;
+  if(carrier){
+    // Check if already linked
+    const ccList=await API.get('companies?type=company_carriers&company_id='+CU.company_id);
+  const existing=ccList.find(cc=>cc.carrier_id===carrier.id)||null;
+    if(existing){
+      result.innerHTML=`<div style="background:var(--yellow-dim);border:1px solid var(--yellow);border-radius:var(--radius-sm);padding:12px;font-size:13px;">⚠️ Transportadora "${carrier.name}" já está vinculada.</div>`;
+      btnLink.style.display='none'; btnCreate.style.display='none'; newForm.style.display='none'; return;
+    }
+    result.innerHTML=`<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:var(--radius-sm);padding:12px;font-size:13px;">✅ Encontrada: <strong>${carrier.name}</strong> — ${carrier.contact_name}</div>`;
+    result.dataset.carrierId=carrier.id;
+    btnLink.style.display='flex'; btnCreate.style.display='none'; newForm.style.display='none';
+  } else {
+    result.innerHTML='';
+    result.dataset.carrierId='';
+    newForm.style.display='block';
+    btnLink.style.display='none'; btnCreate.style.display='flex';
+    document.getElementById('cn-admin-name').value='';
+  }
+}
+
+async function linkCarrier() {
+  const carrierId=document.getElementById('carrier-search-result').dataset.carrierId;
+  if(!carrierId){toast('Nenhuma transportadora selecionada','error');return;}
+  await API.post('companies?type=link_carrier', {company_id:CU.company_id, carrier_id:carrierId});
+  toast('Transportadora vinculada!','success');
+  closeModal('modal-add-carrier');
+  resetCarrierModal();
+  loadEmpCarriers();
+}
+
+async function createAndLinkCarrier() {
+  const email=document.getElementById('carrier-search-email').value.trim().toLowerCase();
+  const name=document.getElementById('cn-name').value.trim();
+  const doc=document.getElementById('cn-doc').value.trim();
+  const contact=document.getElementById('cn-contact').value.trim();
+  const whatsapp=document.getElementById('cn-whatsapp').value.trim();
+  const pass=document.getElementById('cn-pass').value;
+  const adminName=document.getElementById('cn-admin-name').value.trim();
+  if(!name||!doc||!contact||!whatsapp||!pass||!adminName){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  const carrier = await API.post('companies?type=carrier', {name, document:doc, contact_name:contact, contact_whatsapp:whatsapp, contact_email:email, admin_password:pass, admin_name:adminName});
+  await API.post('companies?type=link_carrier', {company_id:CU.company_id, carrier_id:carrier.id});
+  toast(`Transportadora "${name}" criada e vinculada!`,'success');
+  closeModal('modal-add-carrier');
+  resetCarrierModal();
+  loadEmpCarriers();
+}
+
+function resetCarrierModal() {
+  document.getElementById('carrier-search-email').value='';
+  document.getElementById('carrier-search-result').innerHTML='';
+  document.getElementById('carrier-search-result').dataset.carrierId='';
+  document.getElementById('carrier-new-form').style.display='none';
+  document.getElementById('btn-link-carrier').style.display='none';
+  document.getElementById('btn-create-carrier').style.display='none';
+  ['cn-name','cn-doc','cn-contact','cn-whatsapp','cn-pass','cn-admin-name'].forEach(id=>document.getElementById(id).value='');
+}
+
+async function unlinkCarrier(ccId, name) {
+  if(!confirm(`Desvincular transportadora "${name}"?`)) return;
+  await API.delete('companies?type=link_carrier&id='+ccId);
+  toast('Transportadora desvinculada','info'); loadEmpCarriers();
+}
+
+// ── EMPRESA: DASHBOARD ──
+async function loadDashboard() {
+  document.getElementById('emp-company-name').textContent = CU.companies?.name||'—';
+  const data=await API.get('orders?company_id='+CU.company_id);
+  allOrders=(data||[]).filter(o=>o.status!=='arquivado');
+  allOrdersArchived=(data||[]).filter(o=>o.status==='arquivado');
+  renderStats(); renderOrders();
+}
+
+function renderStats() {
+  const t=allOrders.length;
+  const p=allOrders.filter(o=>o.status==='pendente').length;
+  const e=allOrders.filter(o=>o.status==='entregue').length;
+  const pr=allOrders.filter(o=>o.status==='problema').length;
+  document.getElementById('emp-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Ativas</div><div class="stat-value">${t}</div></div>
+    <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-value orange">${p}</div></div>
+    <div class="stat-card"><div class="stat-label">Entregues</div><div class="stat-value green">${e}</div></div>
+    <div class="stat-card"><div class="stat-label">Problemas</div><div class="stat-value red">${pr}</div></div>
+  `;
+}
+
+function setFilter(f,el) {
+  currentFilter=f;
+  document.querySelectorAll('#page-emp-dashboard .filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  renderOrders();
+}
+
+function renderOrders() {
+  const list=document.getElementById('orders-list');
+  const q=(document.getElementById('search-orders')?.value||'').toLowerCase().trim();
+  let pool=currentFilter==='arquivado'?allOrdersArchived:currentFilter==='all'?allOrders:allOrders.filter(o=>o.status===currentFilter);
+  if(q) pool=pool.filter(o=>
+    o.item_description.toLowerCase().includes(q)||
+    o.pickup_address.toLowerCase().includes(q)||
+    o.delivery_address.toLowerCase().includes(q)||
+    (o.pickup_responsible||'').toLowerCase().includes(q)||
+    (o.delivery_responsible||'').toLowerCase().includes(q)||
+    (o.carriers?.name||'').toLowerCase().includes(q)
+  );
+  if(!pool.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">📦</div><h3>${q?'Nenhum resultado':'Nenhuma ordem'}</h3><p>${q?'Tente outros termos':'Crie uma nova ordem'}</p></div>`;return;
+  }
+  const isArch=currentFilter==='arquivado';
+  list.innerHTML=pool.map(o=>`
+    <div class="card" style="cursor:pointer;${isArch?'opacity:.7':''}" onclick="viewOrder('${o.id}')">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">${o.carriers?.name||'—'} · ${fmtDateOnly(o.delivery_scheduled_date)} às ${o.delivery_scheduled_time} · Qtd: ${o.quantity}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${statusLabel(o.status)}
+          ${!isArch?`<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();archiveOrder('${o.id}','${o.item_description.replace(/'/g,"\\'")}')">🗄</button>`
+          :`<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();unarchiveOrder('${o.id}')">↩</button>`}
+        </div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Transportadora</div><div class="info-value">${o.carriers?.name||'—'}</div></div>
+        ${o.users?`<div class="info-item"><div class="info-label">Motorista</div><div class="info-value">${o.users.name}</div></div>`:''}
+      </div>
+      ${o.delivery_timestamp?`<div class="timestamp">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</div>`:''}
+    </div>
+  `).join('');
+}
+
+async function archiveOrder(id,name) {
+  if(!confirm(`Arquivar "${name}"?`)) return;
+  await API.patch('orders', {id, status:'arquivado'});
+  toast('Arquivada','info'); loadDashboard();
+}
+async function unarchiveOrder(id) {
+  await API.patch('orders', {id, status:'entregue'});
+  toast('Restaurada','success'); loadDashboard();
+}
+
+async function openNewOrderModal() {
+  // Load linked carriers
+  const data=await API.get('companies?type=company_carriers&company_id='+CU.company_id);
+  const sel=document.getElementById('o-carrier');
+  sel.innerHTML='<option value="">Selecione a transportadora...</option>';
+  (data||[]).forEach(cc=>{ const opt=document.createElement('option'); opt.value=cc.carriers.id; opt.textContent=cc.carriers.name; sel.appendChild(opt); });
+  document.getElementById('o-date').value=todayISO();
+  openModal('modal-order');
+}
+
+async function createOrder() {
+  const carrierId=document.getElementById('o-carrier').value;
+  const item=document.getElementById('o-item').value.trim();
+  const qty=parseInt(document.getElementById('o-qty').value);
+  const date=document.getElementById('o-date').value;
+  const pAddr=document.getElementById('o-pickup-addr').value.trim();
+  const pTime=document.getElementById('o-pickup-time').value;
+  const pResp=document.getElementById('o-pickup-resp').value.trim();
+  const dAddr=document.getElementById('o-delivery-addr').value.trim();
+  const dTime=document.getElementById('o-delivery-time').value;
+  const dResp=document.getElementById('o-delivery-resp').value.trim();
+  if(!carrierId||!item||!qty||!date||!pAddr||!pTime||!pResp||!dAddr||!dTime||!dResp){toast('Preencha todos os campos','error');return;}
+  await API.post('orders', {company_id:CU.company_id,carrier_id:carrierId,created_by:CU.id,item_description:item,quantity:qty,pickup_address:pAddr,pickup_time:pTime,pickup_responsible:pResp,delivery_address:dAddr,delivery_responsible:dResp,delivery_scheduled_time:dTime,delivery_scheduled_date:date});
+  toast('Ordem criada!','success');
+  closeModal('modal-order');
+  ['o-item','o-pickup-addr','o-pickup-time','o-pickup-resp','o-delivery-addr','o-delivery-time','o-delivery-resp'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('o-qty').value=1; document.getElementById('o-carrier').value='';
+  loadDashboard();
+}
+
+// ── VIEW ORDER ──
+async function viewOrder(id) {
+  const [o]= await API.get('orders?id='+id);
+  if(!o) return;
+  window._currentViewOrder=o;
+  document.getElementById('view-title').textContent=o.item_description;
+  const vf=document.getElementById('view-footer');
+  const ex=vf.querySelector('.btn-danger'); if(ex) ex.remove();
+  if(CU.role==='admin_empresa'){
+    const db=document.createElement('button');
+    db.className='btn btn-danger'; db.textContent='🗑 Excluir';
+    db.onclick=()=>deleteOrderPermanent(o.id,o.item_description);
+    vf.insertBefore(db,vf.firstChild);
+  }
+  let photoHtml=o.delivery_photo_url?`<img src="${o.delivery_photo_url}" class="photo-preview" style="max-width:100%;margin-top:8px;">` :'';
+  let pSig=o.pickup_signature?`<img src="${o.pickup_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">`:'<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
+  let dSig=o.delivery_signature?`<img src="${o.delivery_signature}" style="max-height:80px;border:1px solid var(--border);border-radius:6px;margin-top:8px;">`:'<span style="color:var(--text-muted);font-size:12px;">Não registrada</span>';
+  document.getElementById('view-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">${statusLabel(o.status)}<span class="timestamp">Criada em ${fmtDate(o.created_at)}</span></div>
+    <div class="section-label">Dados</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Item</div><div class="info-value">${o.item_description}</div></div>
+      <div class="info-item"><div class="info-label">Quantidade</div><div class="info-value">${o.quantity}</div></div>
+      <div class="info-item"><div class="info-label">Transportadora</div><div class="info-value">${o.carriers?.name||'—'}</div></div>
+      ${o.users?`<div class="info-item"><div class="info-label">Motorista</div><div class="info-value">${o.users.name}</div></div>`:''}
+      <div class="info-item"><div class="info-label">Data Entrega</div><div class="info-value">${fmtDateOnly(o.delivery_scheduled_date)}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-label">Coleta</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Endereço</div><div class="info-value">${o.pickup_address}</div></div>
+      <div class="info-item"><div class="info-label">Horário</div><div class="info-value">${o.pickup_time}</div></div>
+      <div class="info-item"><div class="info-label">Responsável</div><div class="info-value">${o.pickup_responsible}</div></div>
+      ${o.collector_name?`<div class="info-item"><div class="info-label">Coletado por</div><div class="info-value">${o.collector_name}</div></div>`:''}
+      ${o.pickup_timestamp?`<div class="info-item"><div class="info-label">Horário real</div><div class="info-value timestamp">${fmtDate(o.pickup_timestamp)}</div></div>`:''}
+    </div>
+    ${o.item_confirmed!==null?`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;"><span style="font-size:12px;">${o.item_confirmed?'✅ Item conforme':'⚠️ Item com divergência'}</span><span style="font-size:12px;">${o.quantity_confirmed?'✅ Qtd conforme':'⚠️ Qtd com divergência'}</span></div>`:''}
+    ${o.pickup_notes?`<div style="margin-top:8px;font-size:13px;"><span class="info-label">Obs. coleta:</span> ${o.pickup_notes}</div>`:''}
+    <div style="margin-top:8px;"><span class="info-label">Rubrica coleta:</span><br>${pSig}</div>
+    <div class="divider"></div>
+    <div class="section-label">Entrega</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Endereço</div><div class="info-value">${o.delivery_address}</div></div>
+      <div class="info-item"><div class="info-label">Horário previsto</div><div class="info-value">${o.delivery_scheduled_time}</div></div>
+      <div class="info-item"><div class="info-label">Responsável</div><div class="info-value">${o.delivery_responsible}</div></div>
+      ${o.receiver_name?`<div class="info-item"><div class="info-label">Recebido por</div><div class="info-value">${o.receiver_name}</div></div>`:''}
+      ${o.delivery_timestamp?`<div class="info-item"><div class="info-label">Entregue em</div><div class="info-value timestamp">${fmtDate(o.delivery_timestamp)}</div></div>`:''}
+    </div>
+    ${o.delivery_notes?`<div style="margin-top:8px;font-size:13px;"><span class="info-label">Obs. entrega:</span> ${o.delivery_notes}</div>`:''}
+    <div style="margin-top:8px;"><span class="info-label">Rubrica entrega:</span><br>${dSig}</div>
+    ${photoHtml?`<div style="margin-top:12px;"><div class="info-label">Foto da entrega</div>${photoHtml}</div>`:''}
+  `;
+  openModal('modal-view');
+}
+
+async function deleteOrderPermanent(id,name) {
+  if(!confirm(`⚠️ Excluir permanentemente "${name}"? Irreversível.`)) return;
+  await API.delete('orders?id='+id);
+  toast('Excluída','info'); closeModal('modal-view'); loadDashboard();
+}
+
+// ── EMPRESA: USUÁRIOS ──
+async function loadEmpUsers() {
+  const data=await API.get('users?company_id='+CU.company_id);
+  const list=document.getElementById('emp-users-list');
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">👤</div><h3>Nenhum usuário</h3></div>';return;}
+  list.innerHTML=data.map(u=>`
+    <div class="entity-row">
+      <div class="entity-info">
+        <div class="entity-name">${u.name}</div>
+        <div class="entity-meta">${u.email} · Criado em ${fmtDate(u.created_at)}</div>
+      </div>
+      <div class="entity-actions">
+        <span class="role-pill role-${u.role}">${roleLabel(u.role)}</span>
+        ${u.id!==CU.id?`<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${u.id}','${u.name.replace(/'/g,"\\'")}')">🔑 Reset</button><button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','emp')">Remover</button>`:'<span style="font-size:11px;color:var(--text-muted);">você</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createEmpUser() {
+  const name=document.getElementById('eu-name').value.trim();
+  const email=document.getElementById('eu-email').value.trim().toLowerCase();
+  const pass=document.getElementById('eu-pass').value;
+  const role=document.getElementById('eu-role').value;
+  if(!name||!email||!pass){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  await API.post('users', {name, email, password:pass, role, company_id:CU.company_id});
+  toast('Usuário criado!','success');
+  closeModal('modal-emp-user');
+  ['eu-name','eu-email','eu-pass'].forEach(id=>document.getElementById(id).value='');
+  loadEmpUsers();
+}
+
+async function deleteUser(id,name,ctx) {
+  if(!confirm(`Remover "${name}"?`)) return;
+  await API.delete('users?id='+id);
+  toast('Removido','info');
+  if(ctx==='emp') loadEmpUsers(); else loadCarDrivers();
+}
+
+// ── TRANSPORTADORA ──
+async function loadCarrierOrders() {
+  const today=todayISO();
+  document.getElementById('car-date-label').textContent='Data: '+fmtDateOnly(today);
+  const carrier=CU.carriers;
+  // Banner modo
+  const banner=document.getElementById('car-delegation-banner');
+  if(carrier?.delegation_mode){
+    banner.innerHTML=`<div style="background:var(--purple-dim);border:1px solid var(--purple);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-bottom:12px;">🎯 Modo Delegação — atribua as ordens aos motoristas antes de executar.</div>`;
+  } else {
+    banner.innerHTML=`<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-bottom:12px;">🟢 Modo Livre — todos os motoristas veem e podem executar as ordens.</div>`;
+  }
+  const data=await API.get('orders?carrier_id='+CU.carrier_id+'&date='+today);
+  allCarrierOrders=data||[];
+  renderCarrierOrders();
+}
+
+function setFilterC(f,el) {
+  currentFilterC=f;
+  document.querySelectorAll('#page-car-orders .filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  renderCarrierOrders();
+}
+
+function renderCarrierOrders() {
+  const list=document.getElementById('car-orders-list');
+  let orders=currentFilterC==='all'?allCarrierOrders:allCarrierOrders.filter(o=>o.status===currentFilterC);
+  if(!orders.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><h3>Sem ordens para hoje</h3></div>';return;}
+  const isDelegate=CU.carriers?.delegation_mode;
+  list.innerHTML=orders.map(o=>`
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">${o.companies?.name||'—'} · Qtd: ${o.quantity} · ${o.pickup_time} → ${o.delivery_scheduled_time}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        ${o.users?`<div class="info-item"><div class="info-label">Motorista</div><div class="info-value">${o.users.name}</div></div>`:''}
+      </div>
+      <div class="actions-row">
+        ${isDelegate&&o.status==='pendente'?`<button class="btn btn-primary" onclick="openAssignModal('${o.id}')">Atribuir Motorista</button>`:''}
+        ${!isDelegate&&o.status==='pendente'?`<span style="color:var(--text-muted);font-size:12px;">Aguardando motorista</span>`:''}
+        ${o.status==='atribuido'?`<span style="color:var(--purple);font-size:12px;">✓ Atribuído a ${o.users?.name||'—'}</span>`:''}
+        ${o.status==='coletado'?`<span style="color:var(--blue);font-size:12px;">📦 Em trânsito</span>`:''}
+        ${o.status==='entregue'?`<span style="color:var(--green);font-size:13px;">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</span>`:''}
+        ${o.status==='problema'?`<span style="color:var(--red);font-size:12px;">⚠️ Divergência na coleta</span>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openAssignModal(orderId) {
+  activeOrderId=orderId;
+  const drivers=await API.get('users?carrier_id='+CU.carrier_id);
+  const sel=document.getElementById('assign-driver');
+  sel.innerHTML='<option value="">Selecione...</option>';
+  (drivers||[]).forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.name;sel.appendChild(o);});
+  openModal('modal-assign');
+}
+
+async function assignDriver() {
+  const driverId=document.getElementById('assign-driver').value;
+  if(!driverId){toast('Selecione um motorista','error');return;}
+  await API.patch('orders', {id:activeOrderId, assigned_driver_id:driverId, status:'atribuido'});
+  toast('Motorista atribuído!','success');
+  closeModal('modal-assign'); loadCarrierOrders();
+}
+
+// ── TRANSPORTADORA: MOTORISTAS ──
+async function loadCarDrivers() {
+  const data=await API.get('users?carrier_id='+CU.carrier_id);
+  const list=document.getElementById('car-drivers-list');
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🧑‍✈️</div><h3>Nenhum motorista</h3><p>Adicione motoristas à equipe</p></div>';return;}
+  list.innerHTML=data.map(d=>`
+    <div class="entity-row">
+      <div class="entity-info">
+        <div class="entity-name">${d.name}</div>
+        <div class="entity-meta">${d.email} · Criado em ${fmtDate(d.created_at)}</div>
+      </div>
+      <div class="entity-actions">
+        <span class="role-pill role-motorista">Motorista</span>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" onclick="openResetPassword('${d.id}','${d.name.replace(/'/g,"\\'")}')">🔑 Reset</button>
+        <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteUser('${d.id}','${d.name.replace(/'/g,"\\'")}','car')">Remover</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createDriver() {
+  const name=document.getElementById('cd-name').value.trim();
+  const email=document.getElementById('cd-email').value.trim().toLowerCase();
+  const pass=document.getElementById('cd-pass').value;
+  if(!name||!email||!pass){toast('Preencha todos os campos','error');return;}
+  if(pass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  await API.post('users', {name, email, password:pass, role:'motorista', carrier_id:CU.carrier_id});
+  toast('Motorista criado!','success');
+  closeModal('modal-car-driver');
+  ['cd-name','cd-email','cd-pass'].forEach(id=>document.getElementById(id).value='');
+  loadCarDrivers();
+}
+
+// ── TRANSPORTADORA: CONFIGURAÇÕES ──
+async function loadCarSettings() {
+  const carrier=CU.carriers;
+  document.getElementById('car-settings-body').innerHTML=`
+    <div class="section-label">Modo de Operação</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px;">Modo Delegação</div>
+        <div style="font-size:13px;color:var(--text-muted);max-width:400px;">
+          Quando <strong>ativado</strong>: ordens chegam para o admin da transportadora, que atribui manualmente para um motorista.<br><br>
+          Quando <strong>desativado</strong>: modo livre — todos os motoristas veem e podem executar qualquer ordem.
+        </div>
+      </div>
+      <label class="toggle-switch" style="flex-shrink:0;margin-top:4px;">
+        <input type="checkbox" ${carrier?.delegation_mode?'checked':''} onchange="toggleDelegationMode(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="divider"></div>
+    <div class="section-label">Dados da Transportadora</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Nome</div><div class="info-value">${carrier?.name||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Documento</div><div class="info-value">${carrier?.document||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Responsável</div><div class="info-value">${carrier?.contact_name||'—'}</div></div>
+      <div class="info-item"><div class="info-label">WhatsApp</div><div class="info-value">${carrier?.contact_whatsapp||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Email</div><div class="info-value">${carrier?.contact_email||'—'}</div></div>
+    </div>
+  `;
+}
+
+async function toggleDelegationMode(active) {
+  await API.patch('companies?type=carrier', {id:CU.carrier_id, delegation_mode:active});
+  if(error){toast('Erro: '+error.message,'error');return;}
+  CU.carriers.delegation_mode=active;
+  sessionStorage.setItem('km_user',JSON.stringify(CU));
+  toast(active?'Modo Delegação ativado':'Modo Livre ativado','success');
+}
+
+// ── MOTORISTA ──
+async function loadDriverOrders() {
+  const today=todayISO();
+  document.getElementById('driver-date-label').textContent='Data: '+fmtDateOnly(today);
+  const isDelegate=CU.carriers?.delegation_mode;
+  let qParams='orders?carrier_id='+CU.carrier_id+'&date='+today;
+  if(isDelegate) qParams+='&driver_id='+CU.id;
+  const data=await API.get(qParams);
+  allDriverOrders=data||[];
+  renderDriverOrders();
+}
+
+function setFilterD(f,el) {
+  currentFilterD=f;
+  document.querySelectorAll('#page-driver-orders .filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  renderDriverOrders();
+}
+
+function renderDriverOrders() {
+  const list=document.getElementById('driver-orders-list');
+  let orders=allDriverOrders;
+  if(currentFilterD!=='all'){
+    const statuses=currentFilterD.split(',');
+    orders=orders.filter(o=>statuses.includes(o.status));
+  }
+  if(!orders.length){list.innerHTML='<div class="empty"><div class="empty-icon">🚗</div><h3>Sem ordens para hoje</h3></div>';return;}
+  list.innerHTML=orders.map(o=>`
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${o.item_description}</div>
+          <div class="card-sub">${o.companies?.name||'—'} · Qtd: ${o.quantity} · ${o.pickup_time} → ${o.delivery_scheduled_time}</div>
+        </div>
+        ${statusLabel(o.status)}
+      </div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">Coleta</div><div class="info-value">${o.pickup_address}</div></div>
+        <div class="info-item"><div class="info-label">Resp. Coleta</div><div class="info-value">${o.pickup_responsible}</div></div>
+        <div class="info-item"><div class="info-label">Entrega</div><div class="info-value">${o.delivery_address}</div></div>
+        <div class="info-item"><div class="info-label">Resp. Entrega</div><div class="info-value">${o.delivery_responsible}</div></div>
+      </div>
+      <div class="actions-row">
+        ${o.status==='pendente'||o.status==='atribuido'?`<button class="btn btn-primary" onclick="openCollectModal('${o.id}')">Registrar Coleta</button>`:''}
+        ${o.status==='coletado'||o.status==='problema'?`<button class="btn btn-success" onclick="openDeliveryModal('${o.id}')">Registrar Entrega</button>${o.status==='problema'?'<span style="color:var(--red);font-size:12px;">⚠️ Divergência</span>':''}`:''}
+        ${o.status==='entregue'?`<span style="color:var(--green);font-size:13px;">✓ Entregue em ${fmtDate(o.delivery_timestamp)}</span>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── COLETA MODAL ──
+function openCollectModal(orderId) {
+  activeOrderId=orderId;
+  const pool=[...allDriverOrders,...allCarrierOrders];
+  const o=pool.find(x=>x.id===orderId);
+  document.getElementById('detail-title').textContent='Registrar Coleta — '+o.item_description;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="section-label">Confirmações</div>
+    <div class="field"><label>Nome do Motorista</label><input type="text" id="d-collector" placeholder="Seu nome completo" value="${CU.role==='motorista'?CU.name:''}"></div>
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Item coletado é o que foi solicitado?</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="item-conf" value="yes" onchange="checkProblemNotes()"><span>✅ Sim, conforme</span></label>
+        <label class="check-option"><input type="radio" name="item-conf" value="no" onchange="checkProblemNotes()"><span>⚠️ Não conforme</span></label>
+      </div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Quantidade bate com o solicitado? (${o.quantity} unid.)</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="qty-conf" value="yes" onchange="checkProblemNotes()"><span>✅ Sim, correta</span></label>
+        <label class="check-option"><input type="radio" name="qty-conf" value="no" onchange="checkProblemNotes()"><span>⚠️ Divergente</span></label>
+      </div>
+    </div>
+    <div class="field"><label>Observações <span id="notes-required-label" style="color:var(--red);display:none;">*obrigatório</span></label><textarea id="d-pickup-notes" placeholder="Ex: Faltaram 2 unidades porque..."></textarea></div>
+    <div class="divider"></div>
+    <div class="section-label">Rubrica de Coleta</div>
+    <div class="sig-wrapper" style="position:relative;"><canvas id="sig-collect" style="width:100%;height:140px;"></canvas><div class="sig-placeholder" id="sig-collect-ph">Assine aqui</div></div>
+    <div class="sig-actions"><button class="btn btn-ghost" onclick="clearSig('sig-collect')">Limpar</button></div>
+  `;
+  document.getElementById('detail-footer').innerHTML=`
+    <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitCollect()">Confirmar Coleta</button>
+  `;
+  openModal('modal-detail');
+  setTimeout(()=>initSig('sig-collect'),100);
+}
+
+// ── ENTREGA MODAL ──
+function openDeliveryModal(orderId) {
+  activeOrderId=orderId;
+  const pool=[...allDriverOrders,...allCarrierOrders];
+  const o=pool.find(x=>x.id===orderId);
+  document.getElementById('detail-title').textContent='Registrar Entrega — '+o.item_description;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="field"><label>Nome de quem recebeu</label><input type="text" id="d-receiver" placeholder="Nome do recebedor"></div>
+    <div class="field"><label>Observações <span id="delivery-notes-req" style="color:var(--red);font-size:11px;"></span></label><textarea id="d-delivery-notes" placeholder="Se houver qualquer problema na entrega, descreva aqui..."></textarea></div>
+    <div style="margin-bottom:16px;">
+      <div class="info-label" style="margin-bottom:10px;">Houve algum problema na entrega?</div>
+      <div class="check-group">
+        <label class="check-option"><input type="radio" name="delivery-prob" value="no" onchange="checkDeliveryProblem()"><span>✅ Entrega normal</span></label>
+        <label class="check-option"><input type="radio" name="delivery-prob" value="yes" onchange="checkDeliveryProblem()"><span>⚠️ Houve problema</span></label>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-label">Rubrica de Entrega</div>
+    <div class="sig-wrapper" style="position:relative;"><canvas id="sig-delivery" style="width:100%;height:140px;"></canvas><div class="sig-placeholder" id="sig-delivery-ph">Assine aqui</div></div>
+    <div class="sig-actions"><button class="btn btn-ghost" onclick="clearSig('sig-delivery')">Limpar</button></div>
+    <div class="divider"></div>
+    <div class="section-label">Foto da Entrega</div>
+    <div class="photo-area" onclick="document.getElementById('photo-input').click()" id="photo-area-box"><div style="font-size:32px;">📷</div><p>Toque para tirar foto ou escolher da galeria <strong style="color:var(--red);">*obrigatória</strong></p></div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)">
+    <img id="photo-preview" class="photo-preview" style="display:none;margin-top:12px;">
+  `;
+  document.getElementById('detail-footer').innerHTML=`
+    <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    <button class="btn btn-success" onclick="submitDelivery()">Confirmar Entrega</button>
+  `;
+  openModal('modal-detail');
+  setTimeout(()=>initSig('sig-delivery'),100);
+}
+
+function previewPhoto(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{const img=document.getElementById('photo-preview');img.src=ev.target.result;img.style.display='block';};
+  r.readAsDataURL(file);
+}
+
+async function submitCollect() {
+  const collector=document.getElementById('d-collector').value.trim();
+  const itemConf=document.querySelector('input[name="item-conf"]:checked');
+  const qtyConf=document.querySelector('input[name="qty-conf"]:checked');
+  const notes=document.getElementById('d-pickup-notes').value.trim();
+  if(!collector){toast('Informe o nome do motorista','error');return;}
+  if(!itemConf){toast('Confirme o item','error');return;}
+  if(!qtyConf){toast('Confirme a quantidade','error');return;}
+  const sigData=getSigData('sig-collect');
+  const hasProb=itemConf.value==='no'||qtyConf.value==='no';
+  if(hasProb && !notes){toast('⚠️ Observações obrigatórias quando há divergência','error');document.getElementById('d-pickup-notes').focus();return;}
+  await API.patch('orders', {
+    id:activeOrderId,
+    status:hasProb?'problema':'coletado',
+    collector_name:collector,
+    item_confirmed:itemConf.value==='yes',
+    quantity_confirmed:qtyConf.value==='yes',
+    pickup_notes:notes||null,
+    pickup_signature:sigData||null,
+    pickup_timestamp:new Date().toISOString()
+  });
+  toast(hasProb?'⚠️ Coleta registrada com divergência':'✓ Coleta confirmada!',hasProb?'info':'success');
+  closeModal('modal-detail');
+  if(CU.role==='motorista') loadDriverOrders(); else loadCarrierOrders();
+}
+
+async function submitDelivery() {
+  const receiver=document.getElementById('d-receiver').value.trim();
+  const notes=document.getElementById('d-delivery-notes').value.trim();
+  const sigData=getSigData('sig-delivery');
+  const deliveryProbRad=document.querySelector('input[name="delivery-prob"]:checked');
+  if(!receiver){toast('Informe o nome do recebedor','error');return;}
+  if(!deliveryProbRad){toast('Indique se houve problema na entrega','error');return;}
+  const hasDeliveryProb=deliveryProbRad.value==='yes';
+  if(hasDeliveryProb && !notes){toast('⚠️ Descreva o problema na entrega nas observações','error');document.getElementById('d-delivery-notes').focus();return;}
+  const photoInput=document.getElementById('photo-input');
+  if(!photoInput.files[0]){toast('📷 Foto da entrega é obrigatória','error');document.getElementById('photo-area-box').style.borderColor='var(--red)';return;}
+  let photoUrl=null;
+  if(photoInput.files[0]){
+    const formData=new FormData();
+    formData.append('file',photoInput.files[0]);
+    formData.append('order_id',activeOrderId);
+    const uploadRes=await fetch('/api/upload',{method:'POST',body:formData});
+    const uploadData=await uploadRes.json();
+    if(!uploadRes.ok){toast('Erro ao enviar foto: '+(uploadData.error||'desconhecido'),'error');return;}
+    photoUrl=uploadData.url;
+  }
+  await API.patch('orders', {
+    id:activeOrderId,
+    status:hasDeliveryProb?'problema':'entregue',
+    receiver_name:receiver,
+    delivery_notes:notes||null,
+    delivery_signature:sigData||null,
+    delivery_photo_url:photoUrl,
+    delivery_timestamp:new Date().toISOString()
+  });
+  toast('✓ Entrega confirmada!','success');
+  closeModal('modal-detail');
+  if(CU.role==='motorista') loadDriverOrders(); else loadCarrierOrders();
+}
+
+// ── ASSINATURA ──
+function initSig(canvasId) {
+  const canvas=document.getElementById(canvasId); if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const ph=document.getElementById(canvasId+'-ph');
+  let drawing=false,hasDraw=false;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*window.devicePixelRatio;
+  canvas.height=140*window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio,window.devicePixelRatio);
+  canvas.style.width=rect.width+'px'; canvas.style.height='140px';
+  ctx.strokeStyle='#f97316'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineJoin='round';
+  function getPos(e){const r=canvas.getBoundingClientRect();const s=e.touches?e.touches[0]:e;return{x:s.clientX-r.left,y:s.clientY-r.top};}
+  canvas.addEventListener('mousedown',e=>{drawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
+  canvas.addEventListener('mousemove',e=>{if(!drawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();hasDraw=true;if(ph)ph.style.display='none';});
+  canvas.addEventListener('mouseup',()=>drawing=false);
+  canvas.addEventListener('mouseleave',()=>drawing=false);
+  canvas.addEventListener('touchstart',e=>{e.preventDefault();drawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);},{passive:false});
+  canvas.addEventListener('touchmove',e=>{e.preventDefault();if(!drawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();hasDraw=true;if(ph)ph.style.display='none';},{passive:false});
+  canvas.addEventListener('touchend',()=>drawing=false);
+  sigCanvases[canvasId]={canvas,ctx,hasDraw:()=>hasDraw};
+}
+function clearSig(id){const e=sigCanvases[id];if(!e)return;e.ctx.clearRect(0,0,e.canvas.width,e.canvas.height);const ph=document.getElementById(id+'-ph');if(ph)ph.style.display='';}
+function getSigData(id){const e=sigCanvases[id];if(!e||!e.hasDraw())return null;return e.canvas.toDataURL('image/png');}
+
+// ── PDF ──
+function downloadRecibo() {
+  const o=window._currentViewOrder; if(!o) return;
+  const statusMap={pendente:'Pendente',atribuido:'Atribuído',coletado:'Coletado',entregue:'Entregue',problema:'Problema',arquivado:'Arquivado'};
+  const now=new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+  let pSig=o.pickup_signature?`<img src="${o.pickup_signature}" style="max-height:70px;border:1px solid #ddd;border-radius:4px;margin-top:6px;">`:'<span style="color:#999;font-size:12px;">Não registrada</span>';
+  let dSig=o.delivery_signature?`<img src="${o.delivery_signature}" style="max-height:70px;border:1px solid #ddd;border-radius:4px;margin-top:6px;">`:'<span style="color:#999;font-size:12px;">Não registrada</span>';
+  let photoSection=o.delivery_photo_url?`<div class="st">Foto da Entrega</div><img src="${o.delivery_photo_url}" style="max-width:100%;max-height:250px;border-radius:6px;border:1px solid #ddd;margin-top:8px;">`:'';
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;padding:32px;max-width:720px;margin:0 auto;}
+.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #f97316;padding-bottom:16px;margin-bottom:24px;}
+.brand{font-size:20px;font-weight:700;color:#f97316;}.bsub{font-size:11px;color:#888;margin-top:3px;}
+.di{text-align:right;}.dt{font-size:15px;font-weight:700;}.dd{font-size:11px;color:#888;margin-top:4px;}
+.sb{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;}
+.st{font-size:10px;font-weight:700;text-transform:uppercase;color:#888;margin:20px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px;}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fl{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:3px;}.fv{font-size:13px;font-weight:500;}
+.nb{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin-top:8px;font-size:12px;}
+.sr{display:flex;gap:32px;margin-top:16px;}.sb2{flex:1;}
+.ft{margin-top:32px;border-top:1px solid #eee;padding-top:14px;display:flex;justify-content:space-between;font-size:11px;color:#aaa;}
+.status-entregue{background:#dcfce7;color:#14532d;}.status-problema{background:#fee2e2;color:#7f1d1d;}
+.status-coletado{background:#dbeafe;color:#1e3a8a;}.status-pendente{background:#fef9c3;color:#854d0e;}
+.status-atribuido{background:#f3e8ff;color:#6b21a8;}.status-arquivado{background:#f3f4f6;color:#6b7280;}
+</style></head><body>
+<div class="hdr"><div><div class="brand">KM Entregas</div><div class="bsub">Controle de Coleta e Entrega</div></div>
+<div class="di"><div class="dt">Recibo de Entrega</div><div class="dd">Emitido em ${now}</div><div style="margin-top:8px;"><span class="sb status-${o.status}">${statusMap[o.status]||o.status}</span></div></div></div>
+<div class="st">Dados da Ordem</div>
+<div class="g">
+  <div><div class="fl">Item</div><div class="fv">${o.item_description}</div></div>
+  <div><div class="fl">Quantidade</div><div class="fv">${o.quantity}</div></div>
+  <div><div class="fl">Data de Entrega</div><div class="fv">${o.delivery_scheduled_date?o.delivery_scheduled_date.split('-').reverse().join('/'):'—'}</div></div>
+  <div><div class="fl">Criada em</div><div class="fv">${new Date(o.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</div></div>
+</div>
+<div class="st">Coleta</div>
+<div class="g">
+  <div><div class="fl">Endereço</div><div class="fv">${o.pickup_address}</div></div>
+  <div><div class="fl">Horário previsto</div><div class="fv">${o.pickup_time}</div></div>
+  <div><div class="fl">Responsável</div><div class="fv">${o.pickup_responsible}</div></div>
+  <div><div class="fl">Coletado por</div><div class="fv">${o.collector_name||'—'}</div></div>
+  <div><div class="fl">Horário real</div><div class="fv">${o.pickup_timestamp?new Date(o.pickup_timestamp).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—'}</div></div>
+</div>
+${o.item_confirmed!==null?`<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;"><span style="font-size:12px;">${o.item_confirmed?'✅ Item conforme':'⚠️ Item com divergência'}</span><span style="font-size:12px;">${o.quantity_confirmed?'✅ Qtd conforme':'⚠️ Qtd com divergência'}</span></div>`:''}
+${o.pickup_notes?`<div class="nb"><strong>Obs. coleta:</strong> ${o.pickup_notes}</div>`:''}
+<div class="st">Entrega</div>
+<div class="g">
+  <div><div class="fl">Endereço</div><div class="fv">${o.delivery_address}</div></div>
+  <div><div class="fl">Horário previsto</div><div class="fv">${o.delivery_scheduled_time}</div></div>
+  <div><div class="fl">Responsável</div><div class="fv">${o.delivery_responsible}</div></div>
+  <div><div class="fl">Recebido por</div><div class="fv">${o.receiver_name||'—'}</div></div>
+  <div><div class="fl">Entregue em</div><div class="fv">${o.delivery_timestamp?new Date(o.delivery_timestamp).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—'}</div></div>
+</div>
+${o.delivery_notes?`<div class="nb"><strong>Obs. entrega:</strong> ${o.delivery_notes}</div>`:''}
+<div class="sr"><div class="sb2"><div class="fl" style="margin-bottom:6px;">Rubrica — Coleta</div>${pSig}</div><div class="sb2"><div class="fl" style="margin-bottom:6px;">Rubrica — Entrega</div>${dSig}</div></div>
+${photoSection}
+<div class="ft"><span>KM Entregas</span><span>Documento gerado automaticamente</span></div>
+</body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`recibo_${o.item_description.replace(/[^a-z0-9]/gi,'_').toLowerCase()}.html`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Abra o arquivo e use Ctrl+P para salvar como PDF.','info');
+}
+
+// ── SENHA ──
+let _resetTargetId = null;
+
+function openMyAccount() {
+  document.getElementById('pass-modal-title').textContent = 'Trocar Minha Senha';
+  document.getElementById('pass-current-wrap').style.display = 'flex';
+  _resetTargetId = null;
+  document.getElementById('pass-current').value='';
+  document.getElementById('pass-new').value='';
+  document.getElementById('pass-confirm').value='';
+  openModal('modal-password');
+}
+
+function openResetPassword(userId, userName) {
+  document.getElementById('pass-modal-title').textContent = `Resetar Senha — ${userName}`;
+  document.getElementById('pass-current-wrap').style.display = 'none';
+  _resetTargetId = userId;
+  document.getElementById('pass-new').value='';
+  document.getElementById('pass-confirm').value='';
+  openModal('modal-password');
+}
+
+async function submitChangePassword() {
+  const newPass = document.getElementById('pass-new').value;
+  const confirmPass = document.getElementById('pass-confirm').value;
+  if(!newPass){toast('Informe a nova senha','error');return;}
+  if(newPass.length<6){toast('Senha mínima 6 caracteres','error');return;}
+  if(newPass!==confirmPass){toast('As senhas não conferem','error');return;}
+
+  if(_resetTargetId) {
+    // Admin resetting another user
+    await API.post('change-password', {userId:_resetTargetId, newPassword:newPass, adminUserId:CU.id});
+    toast('Senha resetada com sucesso!','success');
+  } else {
+    const currentPass = document.getElementById('pass-current').value;
+    if(!currentPass){toast('Informe a senha atual','error');return;}
+    await API.post('change-password', {userId:CU.id, currentPassword:currentPass, newPassword:newPass});
+    toast('Senha alterada com sucesso!','success');
+  }
+  closeModal('modal-password');
+}
+
+function checkProblemNotes() {
+  const itemConf=document.querySelector('input[name="item-conf"]:checked');
+  const qtyConf=document.querySelector('input[name="qty-conf"]:checked');
+  const hasProb=(itemConf&&itemConf.value==='no')||(qtyConf&&qtyConf.value==='no');
+  const label=document.getElementById('notes-required-label');
+  if(label) label.style.display=hasProb?'inline':'none';
+  const ta=document.getElementById('d-pickup-notes');
+  if(ta) ta.placeholder=hasProb?'⚠️ Obrigatório: descreva a divergência encontrada...':'Ex: Faltaram 2 unidades porque...';
+}
+
+function checkDeliveryProblem() {
+  const rad=document.querySelector('input[name="delivery-prob"]:checked');
+  const hasProb=rad&&rad.value==='yes';
+  const label=document.getElementById('delivery-notes-req');
+  if(label) label.textContent=hasProb?'*obrigatório':'(opcional)';
+  const ta=document.getElementById('d-delivery-notes');
+  if(ta) ta.placeholder=hasProb?'⚠️ Obrigatório: descreva o problema na entrega...':'Observações adicionais...';
+}
+
+// ── INIT ──
+window.addEventListener('load',()=>{
+  const saved=sessionStorage.getItem('km_user');
+  if(saved){CU=JSON.parse(saved);showApp();}
+});
+</script>
+</body>
+</html>
